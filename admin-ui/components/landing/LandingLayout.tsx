@@ -36,8 +36,11 @@ export default function LandingLayout({ children }: LandingLayoutProps) {
                 How it Works
               </Link>
               <ThemeToggle />
-              <Link href="/dashboard" className="btn btn-primary">
-                Admin Dashboard
+              <Link href="/signin" className="text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100">
+                Sign In
+              </Link>
+              <Link href="/signup" className="btn btn-primary">
+                Get Started Free
               </Link>
             </div>
 
@@ -84,11 +87,18 @@ export default function LandingLayout({ children }: LandingLayoutProps) {
                 How it Works
               </Link>
               <Link 
-                href="/dashboard" 
+                href="/signin" 
+                className="block px-3 py-2 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign In
+              </Link>
+              <Link 
+                href="/signup" 
                 className="block mx-3 my-2 btn btn-primary text-center"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Admin Dashboard
+                Get Started Free
               </Link>
             </div>
           </div>
