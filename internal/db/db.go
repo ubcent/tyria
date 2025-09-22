@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ubcent/edge.link/internal/migrations"
 	_ "github.com/lib/pq"
 )
 
@@ -46,6 +47,22 @@ func New(cfg Config) (*DB, error) {
 	}
 
 	return &DB{DB: db}, nil
+}
+
+// NewWithMigrations creates a new database connection and runs migrations
+func NewWithMigrations(cfg Config) (*DB, error) {
+	db, err := New(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Run migrations
+	if err := migrations.Run(db.DB); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return db, nil
 }
 
 // Close closes the database connection
