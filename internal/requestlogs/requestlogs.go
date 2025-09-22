@@ -2,7 +2,9 @@ package requestlogs
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"time"
 
