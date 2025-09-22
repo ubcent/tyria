@@ -2,6 +2,32 @@
 
 **Edge.link** is a high-performance MVP Proxy-as-a-Service designed for MACH (Microservices, API-first, Cloud-native, Headless) integrations. It provides intelligent API routing, edge caching, rate limiting, authentication, and observability in a single, lightweight service.
 
+## 🎛️ **NEW: SaaS Admin UI**
+
+**✅ Complete Web-based Management Interface:**
+- **Next.js + Tailwind CSS**: Modern, responsive admin dashboard
+- **PostgreSQL Integration**: Persistent configuration storage
+- **Real-time Dashboard**: Live metrics, analytics, and system health
+- **CRUD Operations**: Full management of routes, API keys, and settings
+- **Authentication System**: Secure admin access with session management
+- **Visual Analytics**: Charts, graphs, and performance monitoring
+
+**Admin UI Features:**
+- **Route Management**: Visual route builder with form validation
+- **API Key Management**: Generate, edit, and revoke keys with permissions
+- **Live Metrics**: Real-time performance monitoring and analytics
+- **Request Logs**: Searchable and filterable request history
+- **Configuration Sync**: Real-time sync with proxy service
+
+**Quick Start:**
+```bash
+# Start the admin UI
+cd admin-ui
+npm install
+npm run dev
+# Available at http://localhost:3000
+```
+
 ## 🚀 Features
 
 ### Core Proxy Capabilities

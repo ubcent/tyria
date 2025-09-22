@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: edgelink
+      POSTGRES_USER: edgelink
+      POSTGRES_PASSWORD: edgelink
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./admin-ui/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Edge.link Proxy Service
   edge-proxy:
     build: .
     ports:
@@ -17,17 +32,35 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      - postgres
+
+  # Admin UI
+  admin-ui:
+    build: ./admin-ui
+    ports:
+      - "3000:3000"  # Admin UI
+    environment:
+      - POSTGRES_URL=postgresql://edgelink:edgelink@postgres:5432/edgelink
+      - NEXTAUTH_SECRET=your-secret-key-here
+      - NEXTAUTH_URL=http://localhost:3000
+      - PROXY_API_URL=http://edge-proxy:8080
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - edge-proxy
 
   # Optional: Add a monitoring dashboard
   # grafana:
   #   image: grafana/grafana:latest
   #   ports:
-  #     - "3000:3000"
+  #     - "3001:3000"
   #   environment:
   #     - GF_SECURITY_ADMIN_PASSWORD=admin
   #   volumes:
   #     - grafana-data:/var/lib/grafana
   #   restart: unless-stopped
 
-# volumes:
-#   grafana-data:
+volumes:
+  postgres_data:
+  # grafana-data:
