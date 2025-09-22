@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+'use client'
+
+import { useState } from 'react';
 import Layout from '@/components/layouts/Layout';
 
 interface MetricData {
@@ -11,53 +13,36 @@ interface MetricData {
 }
 
 export default function MetricsPage() {
-  const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [timeframe, setTimeframe] = useState('24h');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchMetrics();
-  }, [timeframe]);
-
-  const fetchMetrics = async () => {
-    setLoading(true);
-    try {
-      // For MVP demo, we'll show mock data
-      // In production, this would fetch from /api/metrics
-      const mockMetrics: MetricData[] = [
-        {
-          route_path: '/api/v1/posts',
-          total_requests: 1250,
-          avg_response_time: 45,
-          success_count: 1200,
-          error_count: 50,
-          cache_hits: 850,
-        },
-        {
-          route_path: '/api/secure/',
-          total_requests: 680,
-          avg_response_time: 120,
-          success_count: 650,
-          error_count: 30,
-          cache_hits: 420,
-        },
-        {
-          route_path: '/public/',
-          total_requests: 320,
-          avg_response_time: 80,
-          success_count: 315,
-          error_count: 5,
-          cache_hits: 280,
-        },
-      ];
-      
-      setMetrics(mockMetrics);
-    } catch (error) {
-      console.error('Failed to fetch metrics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Mock data for MVP demo
+  const metrics: MetricData[] = [
+    {
+      route_path: '/api/v1/posts',
+      total_requests: 1250,
+      avg_response_time: 45,
+      success_count: 1200,
+      error_count: 50,
+      cache_hits: 850,
+    },
+    {
+      route_path: '/api/secure/',
+      total_requests: 680,
+      avg_response_time: 120,
+      success_count: 650,
+      error_count: 30,
+      cache_hits: 420,
+    },
+    {
+      route_path: '/public/',
+      total_requests: 320,
+      avg_response_time: 80,
+      success_count: 315,
+      error_count: 5,
+      cache_hits: 280,
+    },
+  ];
 
   const calculateSuccessRate = (success: number, total: number) => {
     return total > 0 ? ((success / total) * 100).toFixed(1) : '0.0';

@@ -2,31 +2,48 @@
 
 **Edge.link** is a high-performance MVP Proxy-as-a-Service designed for MACH (Microservices, API-first, Cloud-native, Headless) integrations. It provides intelligent API routing, edge caching, rate limiting, authentication, and observability in a single, lightweight service.
 
-## 🎛️ **NEW: SaaS Admin UI**
+## 🎛️ **NEW: SaaS Admin UI with Proper Architecture**
 
-**✅ Complete Web-based Management Interface:**
-- **Next.js + Tailwind CSS**: Modern, responsive admin dashboard
-- **PostgreSQL Integration**: Persistent configuration storage
-- **Real-time Dashboard**: Live metrics, analytics, and system health
-- **CRUD Operations**: Full management of routes, API keys, and settings
-- **Authentication System**: Secure admin access with session management
-- **Visual Analytics**: Charts, graphs, and performance monitoring
+**✅ Clean 2-App Architecture:**
+- **Go Admin API Backend**: Separate Go service for database operations and admin functions
+- **Next.js 14 App Router Frontend**: Modern React app communicating via REST API
+- **No Direct Database Access**: Frontend properly separated from database layer
+- **PostgreSQL Integration**: Centralized configuration storage with proper backend
 
 **Admin UI Features:**
-- **Route Management**: Visual route builder with form validation
-- **API Key Management**: Generate, edit, and revoke keys with permissions
-- **Live Metrics**: Real-time performance monitoring and analytics
-- **Request Logs**: Searchable and filterable request history
-- **Configuration Sync**: Real-time sync with proxy service
+- **Next.js 14 App Router**: Modern file-based routing with server/client components
+- **React Query Integration**: Efficient API state management and caching
+- **Tailwind CSS**: Responsive, professional design system
+- **TypeScript**: Full type safety throughout the frontend
+- **Modular Components**: Reusable UI components and forms
+
+**Architecture Benefits:**
+- **Security**: No database credentials in frontend
+- **Scalability**: Backend can scale independently
+- **Maintainability**: Clear separation of concerns
+- **Performance**: Optimized data fetching and caching
 
 **Quick Start:**
 ```bash
-# Start the admin UI
+# Start complete stack
+docker-compose up
+
+# Or run separately:
+# 1. Start admin API backend
+go build -o bin/admin-api ./cmd/admin-api
+./bin/admin-api -addr :3001
+
+# 2. Start Next.js frontend
 cd admin-ui
 npm install
 npm run dev
-# Available at http://localhost:3000
 ```
+
+**Access Points:**
+- **Admin UI**: http://localhost:3000 (Next.js frontend)
+- **Admin API**: http://localhost:3001 (Go backend)
+- **Proxy Service**: http://localhost:8080 (Main proxy)
+- **Metrics**: http://localhost:9090 (Proxy metrics)
 
 ## 🚀 Features
 

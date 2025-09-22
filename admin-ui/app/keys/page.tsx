@@ -1,64 +1,43 @@
-import { useState, useEffect } from 'react';
+'use client'
+
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Layout from '@/components/layouts/Layout';
-import { ApiKey } from '@/lib/db';
+import { apiKeysApi, type ApiKey } from '@/lib/api/client';
 import { PlusIcon, EyeIcon, EyeSlashIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 export default function ApiKeysPage() {
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [loading, setLoading] = useState(true);
   const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchApiKeys();
-  }, []);
+  const { data: apiKeys, isLoading } = useQuery<ApiKey[]>({
+    queryKey: ['apiKeys'],
+    queryFn: apiKeysApi.getAll,
+  });
 
-  const fetchApiKeys = async () => {
-    try {
-      const response = await fetch('/api/keys');
-      if (response.ok) {
-        const data = await response.json();
-        setApiKeys(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch API keys:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: apiKeysApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+    },
+  });
+
+  const toggleEnabledMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
+      apiKeysApi.update(id, { enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['apiKeys'] });
+    },
+  });
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this API key?')) return;
-
-    try {
-      const response = await fetch(`/api/keys/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setApiKeys(apiKeys.filter(key => key.id !== id));
-      }
-    } catch (error) {
-      console.error('Failed to delete API key:', error);
-    }
+    deleteMutation.mutate(id);
   };
 
   const toggleKeyEnabled = async (id: number, enabled: boolean) => {
-    try {
-      const response = await fetch(`/api/keys/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
-      });
-
-      if (response.ok) {
-        setApiKeys(apiKeys.map(key => 
-          key.id === id ? { ...key, enabled } : key
-        ));
-      }
-    } catch (error) {
-      console.error('Failed to toggle API key:', error);
-    }
+    toggleEnabledMutation.mutate({ id, enabled });
   };
 
   const toggleKeyVisibility = (id: number) => {
@@ -76,7 +55,7 @@ export default function ApiKeysPage() {
     return key.substring(0, 4) + '*'.repeat(key.length - 8) + key.substring(key.length - 4);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Layout>
         <div className="animate-pulse">
@@ -113,7 +92,7 @@ export default function ApiKeysPage() {
 
         {/* API Keys Table */}
         <div className="card p-0 overflow-hidden">
-          {apiKeys.length > 0 ? (
+          {apiKeys && apiKeys.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
@@ -173,6 +152,7 @@ export default function ApiKeysPage() {
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             apiKey.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}
+                          disabled={toggleEnabledMutation.isPending}
                         >
                           {apiKey.enabled ? 'Active' : 'Disabled'}
                         </button>
@@ -186,6 +166,7 @@ export default function ApiKeysPage() {
                         <button
                           onClick={() => handleDelete(apiKey.id)}
                           className="text-red-600 hover:text-red-900"
+                          disabled={deleteMutation.isPending}
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>

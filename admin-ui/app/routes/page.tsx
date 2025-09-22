@@ -1,66 +1,44 @@
-import { useState, useEffect } from 'react';
+'use client'
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Layout from '@/components/layouts/Layout';
-import { ProxyRoute } from '@/lib/db';
+import { routesApi, type ProxyRoute } from '@/lib/api/client';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 
 export default function RoutesPage() {
-  const [routes, setRoutes] = useState<ProxyRoute[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    fetchRoutes();
-  }, []);
+  const { data: routes, isLoading } = useQuery<ProxyRoute[]>({
+    queryKey: ['routes'],
+    queryFn: routesApi.getAll,
+  });
 
-  const fetchRoutes = async () => {
-    try {
-      const response = await fetch('/api/routes');
-      if (response.ok) {
-        const data = await response.json();
-        setRoutes(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch routes:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const deleteMutation = useMutation({
+    mutationFn: routesApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['routes'] });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) =>
+      routesApi.update(id, { enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['routes'] });
+    },
+  });
 
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this route?')) return;
-
-    try {
-      const response = await fetch(`/api/routes/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setRoutes(routes.filter(route => route.id !== id));
-      }
-    } catch (error) {
-      console.error('Failed to delete route:', error);
-    }
+    deleteMutation.mutate(id);
   };
 
   const toggleRoute = async (id: number, enabled: boolean) => {
-    try {
-      const response = await fetch(`/api/routes/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
-      });
-
-      if (response.ok) {
-        setRoutes(routes.map(route => 
-          route.id === id ? { ...route, enabled } : route
-        ));
-      }
-    } catch (error) {
-      console.error('Failed to toggle route:', error);
-    }
+    toggleMutation.mutate({ id, enabled });
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <Layout>
         <div className="animate-pulse">
@@ -97,7 +75,7 @@ export default function RoutesPage() {
 
         {/* Routes Table */}
         <div className="card p-0 overflow-hidden">
-          {routes.length > 0 ? (
+          {routes && routes.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="table">
                 <thead>
@@ -172,6 +150,7 @@ export default function RoutesPage() {
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             route.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}
+                          disabled={toggleMutation.isPending}
                         >
                           {route.enabled ? 'Active' : 'Inactive'}
                         </button>
@@ -187,6 +166,7 @@ export default function RoutesPage() {
                           <button
                             onClick={() => handleDelete(route.id)}
                             className="text-red-600 hover:text-red-900"
+                            disabled={deleteMutation.isPending}
                           >
                             <TrashIcon className="h-4 w-4" />
                           </button>

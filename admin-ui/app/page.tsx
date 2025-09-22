@@ -1,63 +1,24 @@
-import { useState, useEffect } from 'react';
+'use client'
+
+import { useQuery } from '@tanstack/react-query';
 import Layout from '@/components/layouts/Layout';
-import { useRouter } from 'next/router';
-
-interface DashboardStats {
-  totalRequests: number;
-  avgResponseTime: number;
-  successRate: number;
-  cacheHitRate: number;
-  activeRoutes: number;
-  activeApiKeys: number;
-}
-
-interface RecentActivity {
-  id: number;
-  message: string;
-  timestamp: string;
-  type: 'success' | 'warning' | 'error';
-}
+import { dashboardApi, type DashboardStats, type Activity } from '@/lib/api/client';
+import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalRequests: 0,
-    avgResponseTime: 0,
-    successRate: 0,
-    cacheHitRate: 0,
-    activeRoutes: 0,
-    activeApiKeys: 0,
+  const router = useRouter();
+
+  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
+    queryKey: ['dashboard', 'stats'],
+    queryFn: dashboardApi.getStats,
   });
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const { data: activity, isLoading: activityLoading } = useQuery<Activity[]>({
+    queryKey: ['dashboard', 'activity'],
+    queryFn: dashboardApi.getActivity,
+  });
 
-  const fetchDashboardData = async () => {
-    try {
-      const [statsRes, activityRes] = await Promise.all([
-        fetch('/api/dashboard/stats'),
-        fetch('/api/dashboard/activity'),
-      ]);
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
-
-      if (activityRes.ok) {
-        const activityData = await activityRes.json();
-        setRecentActivity(activityData);
-      }
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (statsLoading || activityLoading) {
     return (
       <Layout>
         <div className="animate-pulse">
@@ -90,42 +51,42 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <StatCard
             title="Total Requests"
-            value={stats.totalRequests.toLocaleString()}
+            value={stats?.total_requests.toLocaleString() || '0'}
             icon="📊"
             trend="+12%"
             trendColor="text-green-600"
           />
           <StatCard
             title="Avg Response Time"
-            value={`${stats.avgResponseTime}ms`}
+            value={`${stats?.avg_response_time || 0}ms`}
             icon="⚡"
             trend="-5ms"
             trendColor="text-green-600"
           />
           <StatCard
             title="Success Rate"
-            value={`${stats.successRate.toFixed(1)}%`}
+            value={`${stats?.success_rate.toFixed(1) || '0.0'}%`}
             icon="✅"
             trend="+0.2%"
             trendColor="text-green-600"
           />
           <StatCard
             title="Cache Hit Rate"
-            value={`${stats.cacheHitRate.toFixed(1)}%`}
+            value={`${stats?.cache_hit_rate.toFixed(1) || '0.0'}%`}
             icon="💾"
             trend="+3%"
             trendColor="text-green-600"
           />
           <StatCard
             title="Active Routes"
-            value={stats.activeRoutes.toString()}
+            value={stats?.active_routes.toString() || '0'}
             icon="🛣️"
             trend="No change"
             trendColor="text-gray-500"
           />
           <StatCard
             title="Active API Keys"
-            value={stats.activeApiKeys.toString()}
+            value={stats?.active_api_keys.toString() || '0'}
             icon="🔑"
             trend="No change"
             trendColor="text-gray-500"
@@ -135,17 +96,17 @@ export default function Dashboard() {
         {/* Recent Activity */}
         <div className="card">
           <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
-          {recentActivity.length > 0 ? (
+          {activity && activity.length > 0 ? (
             <div className="space-y-3">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center space-x-3">
+              {activity.map((item) => (
+                <div key={item.id} className="flex items-center space-x-3">
                   <div className={`w-2 h-2 rounded-full ${
-                    activity.type === 'success' ? 'bg-green-400' :
-                    activity.type === 'warning' ? 'bg-yellow-400' : 'bg-red-400'
+                    item.type === 'success' ? 'bg-green-400' :
+                    item.type === 'warning' ? 'bg-yellow-400' : 'bg-red-400'
                   }`} />
                   <div className="flex-1">
-                    <p className="text-sm text-gray-900">{activity.message}</p>
-                    <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                    <p className="text-sm text-gray-900">{item.message}</p>
+                    <p className="text-xs text-gray-500">{item.timestamp}</p>
                   </div>
                 </div>
               ))}
@@ -164,24 +125,28 @@ export default function Dashboard() {
               icon="➕"
               title="Add Route"
               description="Create new proxy route"
+              onClick={() => router.push('/routes/new')}
             />
             <QuickActionButton
               href="/keys/new"
               icon="🔐"
               title="Generate API Key"
               description="Create new API key"
+              onClick={() => router.push('/keys/new')}
             />
             <QuickActionButton
               href="/metrics"
               icon="📈"
               title="View Metrics"
               description="Detailed analytics"
+              onClick={() => router.push('/metrics')}
             />
             <QuickActionButton
-              href="/logs"
+              href="/routes"
               icon="📋"
-              title="View Logs"
-              description="Recent request logs"
+              title="Manage Routes"
+              description="Edit proxy routes"
+              onClick={() => router.push('/routes')}
             />
           </div>
         </div>
@@ -220,14 +185,13 @@ interface QuickActionButtonProps {
   icon: string;
   title: string;
   description: string;
+  onClick: () => void;
 }
 
-function QuickActionButton({ href, icon, title, description }: QuickActionButtonProps) {
-  const router = useRouter();
-
+function QuickActionButton({ icon, title, description, onClick }: QuickActionButtonProps) {
   return (
     <button
-      onClick={() => router.push(href)}
+      onClick={onClick}
       className="text-left p-4 rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-colors"
     >
       <div className="text-xl mb-2">{icon}</div>

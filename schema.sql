@@ -1,6 +1,6 @@
--- PostgreSQL schema for Edge.link Admin UI
+-- PostgreSQL schema for Edge.link Admin API
 
--- Users table for authentication
+-- Users table for authentication (optional for future use)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,

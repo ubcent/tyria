@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+'use client'
+
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { ProxyRoute } from '@/lib/db';
+import { type ProxyRoute } from '@/lib/api/client';
 
 interface RouteFormProps {
   route?: ProxyRoute;

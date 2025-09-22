@@ -1,8 +1,9 @@
-import { ReactNode } from 'react';
+'use client'
+
+import { ReactNode, useState } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { usePathname } from 'next/navigation';
 
 interface LayoutProps {
   children: ReactNode;
@@ -13,12 +14,11 @@ const navigation = [
   { name: 'Routes', href: '/routes', icon: '🛣️' },
   { name: 'API Keys', href: '/keys', icon: '🔑' },
   { name: 'Metrics', href: '/metrics', icon: '📈' },
-  { name: 'Logs', href: '/logs', icon: '📋' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const router = useRouter();
+  const pathname = usePathname();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -34,13 +34,13 @@ export default function Layout({ children }: LayoutProps) {
               <XMarkIcon className="h-6 w-6 text-white" />
             </button>
           </div>
-          <SidebarContent />
+          <SidebarContent pathname={pathname} />
         </div>
       </div>
 
       {/* Static sidebar for desktop */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
-        <SidebarContent />
+        <SidebarContent pathname={pathname} />
       </div>
 
       {/* Main content */}
@@ -65,9 +65,7 @@ export default function Layout({ children }: LayoutProps) {
   );
 }
 
-function SidebarContent() {
-  const router = useRouter();
-
+function SidebarContent({ pathname }: { pathname: string }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-white border-r border-gray-200">
       <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
@@ -79,7 +77,7 @@ function SidebarContent() {
         </div>
         <nav className="mt-8 flex-1 px-2 space-y-1">
           {navigation.map((item) => {
-            const isActive = router.pathname === item.href;
+            const isActive = pathname === item.href;
             return (
               <Link
                 key={item.name}
