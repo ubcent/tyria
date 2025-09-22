@@ -108,7 +108,7 @@ export default function PricingSection() {
 
               <div className="text-center">
                 <Link 
-                  href={plan.name === "Enterprise" ? "#contact" : "/dashboard"} 
+                  href={plan.name === "Enterprise" ? "#contact" : "/signup"} 
                   className={`${plan.buttonClass} w-full justify-center`}
                 >
                   {plan.buttonText}
