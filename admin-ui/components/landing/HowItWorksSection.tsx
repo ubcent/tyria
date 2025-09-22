@@ -50,13 +50,13 @@ export default function HowItWorksSection() {
   ];
 
   return (
-    <section id="how-it-works" className="py-20 bg-white">
+    <section id="how-it-works" className="py-20 bg-white dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
             How Edge.link Works
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
             Get up and running in minutes with our simple three-step process.
           </p>
         </div>
@@ -66,19 +66,19 @@ export default function HowItWorksSection() {
             <div key={index} className={`flex flex-col ${index % 2 === 1 ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center gap-12`}>
               <div className="flex-1">
                 <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mr-4">
-                    <span className="text-xl font-bold text-primary-600">{step.step}</span>
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center mr-4">
+                    <span className="text-xl font-bold text-primary-600 dark:text-primary-400">{step.step}</span>
                   </div>
-                  <div className="text-primary-600">
+                  <div className="text-primary-600 dark:text-primary-400">
                     {step.icon}
                   </div>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">{step.title}</h3>
-                <p className="text-lg text-gray-600 mb-6">{step.description}</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">{step.title}</h3>
+                <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">{step.description}</p>
                 
                 {/* Benefits list for each step */}
                 {index === 0 && (
-                  <ul className="space-y-2 text-gray-600">
+                  <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                     <li className="flex items-center">
                       <svg className="w-4 h-4 text-primary-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -101,7 +101,7 @@ export default function HowItWorksSection() {
                 )}
                 
                 {index === 1 && (
-                  <ul className="space-y-2 text-gray-600">
+                  <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                     <li className="flex items-center">
                       <svg className="w-4 h-4 text-primary-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -124,7 +124,7 @@ export default function HowItWorksSection() {
                 )}
                 
                 {index === 2 && (
-                  <ul className="space-y-2 text-gray-600">
+                  <ul className="space-y-2 text-gray-600 dark:text-gray-300">
                     <li className="flex items-center">
                       <svg className="w-4 h-4 text-primary-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -148,7 +148,7 @@ export default function HowItWorksSection() {
               </div>
               
               <div className="flex-1">
-                <div className="bg-gray-900 rounded-lg p-6 text-green-400 font-mono text-sm overflow-x-auto">
+                <div className="bg-gray-900 dark:bg-gray-800 rounded-lg p-6 text-green-400 dark:text-green-300 font-mono text-sm overflow-x-auto">
                   <pre>{step.code}</pre>
                 </div>
               </div>
@@ -158,11 +158,11 @@ export default function HowItWorksSection() {
 
         {/* Quick Start CTA */}
         <div className="mt-20 text-center">
-          <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-2xl p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">
+          <div className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900 dark:to-blue-900 rounded-2xl p-8">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
               Ready to get started?
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               Join thousands of developers already using Edge.link to power their MACH integrations.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
