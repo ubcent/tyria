@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
-import { signUp, redirectIfAuthenticated } from '../../../lib/auth'
+import { signUp, redirectIfAuthenticated } from '../../lib/auth'
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
@@ -20,9 +20,6 @@ export default function SignupPage() {
   const [error, setError] = useState('')
   const router = useRouter()
 
-  // Redirect if already authenticated
-  redirectIfAuthenticated()
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -37,10 +34,10 @@ export default function SignupPage() {
       return
     }
     
-    const formData = new FormData(e.target as HTMLFormElement)
+    const submitFormData = new FormData(e.target as HTMLFormElement)
     
     startTransition(async () => {
-      const result = await signUp(formData)
+      const result = await signUp(submitFormData)
       
       if (result.error) {
         setError(result.error)

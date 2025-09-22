@@ -3,10 +3,8 @@ package admin
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/ubcent/edge.link/internal/auth"
 	"github.com/ubcent/edge.link/internal/models"
@@ -262,6 +260,11 @@ func (a *AuthServer) SetupAuthRoutes(router *http.ServeMux) {
 	// Protected routes
 	authMiddleware := auth.NewAuthMiddleware(a.jwtManager)
 	router.Handle("/api/auth/profile", authMiddleware.RequireAuth(http.HandlerFunc(a.HandleProfile)))
+}
+
+// GetAuthMiddleware returns the auth middleware for use in other routes
+func (a *AuthServer) GetAuthMiddleware() *auth.AuthMiddleware {
+	return auth.NewAuthMiddleware(a.jwtManager)
 }
 
 // ConfirmEmailRequest represents email confirmation request

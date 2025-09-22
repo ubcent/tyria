@@ -7,11 +7,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	_ "modernc.org/sqlite"
 )
 
 // Server represents the admin API server
@@ -68,7 +70,14 @@ type DashboardStats struct {
 
 // NewServer creates a new admin API server
 func NewServer(databaseURL string) (*Server, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	var driverName string
+	if strings.Contains(databaseURL, "file:") || strings.Contains(databaseURL, "sqlite") {
+		driverName = "sqlite"
+	} else {
+		driverName = "postgres"
+	}
+
+	db, err := sql.Open(driverName, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -92,6 +101,19 @@ func (s *Server) setupRoutes() {
 
 	// CORS middleware
 	api.Use(s.corsMiddleware)
+
+	// Auth routes
+	authServer := NewAuthServer(s.db)
+	api.HandleFunc("/auth/signup", authServer.HandleSignup).Methods("POST", "OPTIONS")
+	api.HandleFunc("/auth/signin", authServer.HandleSignin).Methods("POST", "OPTIONS")
+	api.HandleFunc("/auth/signout", authServer.HandleSignout).Methods("POST", "OPTIONS")
+	api.HandleFunc("/auth/confirm-email", authServer.HandleConfirmEmail).Methods("POST", "OPTIONS")
+	
+	// Protected auth routes
+	authMiddleware := authServer.GetAuthMiddleware()
+	protectedAuth := api.PathPrefix("/auth").Subrouter()
+	protectedAuth.Use(authMiddleware.RequireAuth)
+	protectedAuth.HandleFunc("/profile", authServer.HandleProfile).Methods("GET", "OPTIONS")
 
 	// Routes management
 	api.HandleFunc("/routes", s.handleRoutes).Methods("GET", "POST", "OPTIONS")

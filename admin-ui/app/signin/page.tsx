@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
-import { signIn, redirectIfAuthenticated } from '../../../lib/auth'
+import { signIn, redirectIfAuthenticated } from '../../lib/auth'
 
 export default function SigninPage() {
   const [formData, setFormData] = useState({
@@ -18,17 +18,14 @@ export default function SigninPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Redirect if already authenticated
-  redirectIfAuthenticated()
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     
-    const formData = new FormData(e.target as HTMLFormElement)
+    const submitFormData = new FormData(e.target as HTMLFormElement)
     
     startTransition(async () => {
-      const result = await signIn(formData)
+      const result = await signIn(submitFormData)
       
       if (result.error) {
         setError(result.error)
