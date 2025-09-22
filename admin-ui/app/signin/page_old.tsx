@@ -1,52 +1,40 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
-import { signIn, redirectIfAuthenticated } from '../../../lib/auth'
+import { useState } from 'react';
+import Link from 'next/link';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export default function SigninPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [isPending, startTransition] = useTransition()
-  const [error, setError] = useState('')
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
-  // Redirect if already authenticated
-  redirectIfAuthenticated()
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
+    e.preventDefault();
+    setIsLoading(true);
     
-    const formData = new FormData(e.target as HTMLFormElement)
+    // TODO: Implement actual signin logic
+    console.log('Signin attempt:', formData);
     
-    startTransition(async () => {
-      const result = await signIn(formData)
-      
-      if (result.error) {
-        setError(result.error)
-      } else {
-        // Redirect to intended page or dashboard
-        const redirectTo = searchParams.get('redirect') || '/dashboard'
-        router.push(redirectTo)
-      }
-    })
-  }
+    // Simulate API call
+    setTimeout(() => {
+      setIsLoading(false);
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
+    }, 1000);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
-    }))
-  }
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -67,14 +55,6 @@ export default function SigninPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-200 dark:border-gray-700">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
-              <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4">
-                <div className="text-sm text-red-700 dark:text-red-400">
-                  {error}
-                </div>
-              </div>
-            )}
-
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Email address
@@ -149,10 +129,10 @@ export default function SigninPage() {
             <div>
               <button
                 type="submit"
-                disabled={isPending}
+                disabled={isLoading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isPending ? 'Signing in...' : 'Sign in'}
+                {isLoading ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
           </form>
@@ -179,5 +159,5 @@ export default function SigninPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

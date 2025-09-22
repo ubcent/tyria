@@ -21,7 +21,7 @@ type User struct {
 	TenantID       int       `json:"tenant_id" db:"tenant_id"`
 	Email          string    `json:"email" db:"email"`
 	HashedPassword string    `json:"-" db:"hashed_password"` // Hidden from JSON
-	Role           string    `json:"role" db:"role"`         // admin, user
+	Role           string    `json:"role" db:"role"`         // owner, admin, viewer
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }

@@ -6,6 +6,7 @@ toolchain go1.24.7
 
 require (
 	github.com/go-chi/chi/v5 v5.2.3
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
 	github.com/pressly/goose/v3 v3.25.0
@@ -21,4 +22,5 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 )
