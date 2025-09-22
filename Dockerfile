@@ -1,7 +1,14 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
+
+# Install ca-certificates for HTTPS downloads
+RUN apk --no-cache add ca-certificates && update-ca-certificates
 
 WORKDIR /app
+
+# Set Go proxy to direct if needed
+ENV GOPROXY=direct
+ENV GOSUMDB=off
 
 # Copy go mod files
 COPY go.mod go.sum ./
