@@ -1,38 +1,26 @@
 # Build stage
 FROM golang:1.22-alpine AS builder
 
-# Install ca-certificates for HTTPS downloads
-RUN apk --no-cache add ca-certificates && update-ca-certificates
-
 WORKDIR /app
 
-# Set Go proxy to direct if needed
-ENV GOPROXY=direct
-ENV GOSUMDB=off
-
-# Copy go mod files
+# Copy go modules and vendor directory
 COPY go.mod go.sum ./
-RUN go mod download
+COPY vendor ./vendor
 
 # Copy source code
 COPY . .
 
-# Build the admin API
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o admin-api ./cmd/admin-api
+# Build the admin API using vendor
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bin/admin-api ./cmd/admin-api
 
-# Production stage
-FROM alpine:latest
-
-# Install CA certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
+# Final stage - use distroless for security and minimal size
+FROM gcr.io/distroless/static:nonroot
 
 # Copy the binary from builder stage
-COPY --from=builder /app/admin-api .
+COPY --from=builder /app/bin/admin-api /admin-api
 
 # Expose port
 EXPOSE 3001
 
 # Run the admin API
-CMD ["./admin-api", "-addr", ":3001"]
+CMD ["/admin-api"]
