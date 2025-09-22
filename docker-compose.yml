@@ -1,0 +1,67 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: edgelink
+      POSTGRES_USER: edgelink
+      POSTGRES_PASSWORD: edgelink
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Edge.link Proxy Service
+  edge-proxy:
+    build: .
+    ports:
+      - "8080:8080"  # Proxy server
+      - "9090:9090"  # Metrics server
+    volumes:
+      - ./examples/config.yaml:/config.yaml:ro  # Mount example config
+    environment:
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  # Admin API (Go backend)
+  admin-api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.admin-api
+    ports:
+      - "3001:3001"  # Admin API
+    environment:
+      - POSTGRES_URL=postgresql://edgelink:edgelink@postgres:5432/edgelink
+    restart: unless-stopped
+    depends_on:
+      - postgres
+
+  # Admin UI (Next.js frontend)
+  admin-ui:
+    build: ./admin-ui
+    ports:
+      - "3000:3000"  # Admin UI
+    environment:
+      - ADMIN_API_URL=http://admin-api:3001
+    restart: unless-stopped
+    depends_on:
+      - admin-api
+
+  # Optional: Add a monitoring dashboard
+  # grafana:
+  #   image: grafana/grafana:latest
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=admin
+  #   volumes:
+  #     - grafana-data:/var/lib/grafana
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+  # grafana-data:
