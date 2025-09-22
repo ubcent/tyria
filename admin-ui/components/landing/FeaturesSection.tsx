@@ -57,27 +57,27 @@ export default function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="py-20 bg-white">
+    <section id="features" className="py-20 bg-white dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
             Everything you need for modern API management
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
             Built for MACH architectures with enterprise-grade features that scale from prototype to production.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-              <div className="text-primary-600 mb-4">
+            <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-lg transition-shadow">
+              <div className="text-primary-600 dark:text-primary-400 mb-4">
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
                 {feature.title}
               </h3>
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-300">
                 {feature.description}
               </p>
             </div>
@@ -85,27 +85,27 @@ export default function FeaturesSection() {
         </div>
 
         {/* Performance Stats */}
-        <div className="mt-20 bg-gradient-to-r from-primary-50 to-blue-50 rounded-2xl p-8">
+        <div className="mt-20 bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900 dark:to-blue-900 rounded-2xl p-8">
           <div className="text-center mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Built for Performance</h3>
-            <p className="text-gray-600">Optimized for high-throughput, low-latency operations</p>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Built for Performance</h3>
+            <p className="text-gray-600 dark:text-gray-300">Optimized for high-throughput, low-latency operations</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-2xl font-bold text-primary-600">Thread-Safe</div>
-              <div className="text-sm text-gray-600">Minimal lock contention</div>
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">Thread-Safe</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Minimal lock contention</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-primary-600">Memory Efficient</div>
-              <div className="text-sm text-gray-600">LRU cache with limits</div>
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">Memory Efficient</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">LRU cache with limits</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-primary-600">Zero Downtime</div>
-              <div className="text-sm text-gray-600">Hot configuration reload</div>
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">Zero Downtime</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Hot configuration reload</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-primary-600">Go Native</div>
-              <div className="text-sm text-gray-600">High-performance runtime</div>
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">Go Native</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">High-performance runtime</div>
             </div>
           </div>
         </div>

@@ -57,13 +57,13 @@ export default function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="py-20 bg-gray-50">
+    <section id="pricing" className="py-20 bg-gray-50 dark:bg-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
             Simple, transparent pricing
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
             Start free, scale as you grow. No hidden fees, no vendor lock-in.
           </p>
         </div>
@@ -72,8 +72,8 @@ export default function PricingSection() {
           {plans.map((plan, index) => (
             <div 
               key={index} 
-              className={`bg-white rounded-lg shadow-lg border-2 p-8 relative ${
-                plan.popular ? 'border-primary-500 scale-105' : 'border-gray-200'
+              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg border-2 p-8 relative ${
+                plan.popular ? 'border-primary-500 scale-105' : 'border-gray-200 dark:border-gray-700'
               }`}
             >
               {plan.popular && (
@@ -85,14 +85,14 @@ export default function PricingSection() {
               )}
               
               <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">{plan.name}</h3>
                 <div className="mb-2">
-                  <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                  <span className="text-4xl font-bold text-gray-900 dark:text-gray-100">{plan.price}</span>
                   {plan.period !== "Contact us" && (
-                    <span className="text-gray-500 ml-1">/{plan.period}</span>
+                    <span className="text-gray-500 dark:text-gray-400 ml-1">/{plan.period}</span>
                   )}
                 </div>
-                <p className="text-gray-600">{plan.description}</p>
+                <p className="text-gray-600 dark:text-gray-300">{plan.description}</p>
               </div>
 
               <ul className="space-y-4 mb-8">
@@ -101,7 +101,7 @@ export default function PricingSection() {
                     <svg className="w-5 h-5 text-primary-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="text-gray-700">{feature}</span>
+                    <span className="text-gray-700 dark:text-gray-300">{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -120,25 +120,25 @@ export default function PricingSection() {
 
         {/* FAQ */}
         <div className="mt-20">
-          <h3 className="text-2xl font-bold text-gray-900 text-center mb-8">
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 text-center mb-8">
             Frequently Asked Questions
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">Can I upgrade or downgrade anytime?</h4>
-              <p className="text-gray-600 text-sm">Yes, you can change your plan at any time. Changes take effect immediately with prorated billing.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Can I upgrade or downgrade anytime?</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">Yes, you can change your plan at any time. Changes take effect immediately with prorated billing.</p>
             </div>
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">What happens if I exceed my plan limits?</h4>
-              <p className="text-gray-600 text-sm">We'll notify you before hitting limits. Overage is billed at $0.05 per 1K requests.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">What happens if I exceed my plan limits?</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">We'll notify you before hitting limits. Overage is billed at $0.05 per 1K requests.</p>
             </div>
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">Do you offer custom enterprise plans?</h4>
-              <p className="text-gray-600 text-sm">Yes, we offer custom enterprise solutions with dedicated support and infrastructure.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Do you offer custom enterprise plans?</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">Yes, we offer custom enterprise solutions with dedicated support and infrastructure.</p>
             </div>
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">Is there a free trial for paid plans?</h4>
-              <p className="text-gray-600 text-sm">Yes, all paid plans include a 14-day free trial. No credit card required to start.</p>
+              <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Is there a free trial for paid plans?</h4>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">Yes, all paid plans include a 14-day free trial. No credit card required to start.</p>
             </div>
           </div>
         </div>
