@@ -3,8 +3,8 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'Edge.link Admin',
-  description: 'Admin interface for Edge.link Proxy-as-a-Service',
+  title: 'Edge.link - Proxy-as-a-Service for MACH integrations',
+  description: 'High-performance API routing, intelligent caching, rate limiting, and security for modern microservices architectures. Deploy in seconds, scale effortlessly.',
 }
 
 export default function RootLayout({
