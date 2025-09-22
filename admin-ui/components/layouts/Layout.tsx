@@ -10,7 +10,7 @@ interface LayoutProps {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: '📊' },
+  { name: 'Dashboard', href: '/dashboard', icon: '📊' },
   { name: 'Routes', href: '/routes', icon: '🛣️' },
   { name: 'API Keys', href: '/keys', icon: '🔑' },
   { name: 'Metrics', href: '/metrics', icon: '📈' },
