@@ -59,3 +59,9 @@ temp/
 *~
 *.bak
 *.backup
+
+# Node.js dependencies and build artifacts
+admin-ui/node_modules/
+admin-ui/.next/
+admin-ui/out/
+admin-ui/.env.local
