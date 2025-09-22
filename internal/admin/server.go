@@ -7,9 +7,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -176,7 +178,7 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 	var routes []ProxyRoute
 	for rows.Next() {
 		var route ProxyRoute
-		var methods, authKeys string
+		var methods, authKeys pq.StringArray
 
 		err := rows.Scan(
 			&route.ID, &route.Path, &route.Target, &methods, &route.CacheEnabled, &route.CacheTTL,
@@ -190,9 +192,9 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Parse JSON arrays
-		json.Unmarshal([]byte(methods), &route.Methods)
-		json.Unmarshal([]byte(authKeys), &route.AuthKeys)
+		// Convert pq.StringArray to []string
+		route.Methods = []string(methods)
+		route.AuthKeys = []string(authKeys)
 
 		routes = append(routes, route)
 	}
@@ -209,8 +211,9 @@ func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	methodsJSON, _ := json.Marshal(route.Methods)
-	authKeysJSON, _ := json.Marshal(route.AuthKeys)
+	// Convert to PostgreSQL arrays
+	methodsArray := pq.StringArray(route.Methods)
+	authKeysArray := pq.StringArray(route.AuthKeys)
 
 	query := `
 		INSERT INTO proxy_routes (
@@ -223,9 +226,9 @@ func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 	`
 
 	err := s.db.QueryRow(query,
-		route.Path, route.Target, string(methodsJSON), route.CacheEnabled, route.CacheTTL,
+		route.Path, route.Target, methodsArray, route.CacheEnabled, route.CacheTTL,
 		route.RateLimitEnabled, route.RateLimitRate, route.RateLimitBurst, route.RateLimitPeriod,
-		route.RateLimitPerClient, route.AuthRequired, string(authKeysJSON), route.ValidationEnabled,
+		route.RateLimitPerClient, route.AuthRequired, authKeysArray, route.ValidationEnabled,
 		route.ValidationRequestSchema, route.ValidationResponseSchema, route.Enabled,
 	).Scan(&route.ID, &route.CreatedAt, &route.UpdatedAt)
 
@@ -248,8 +251,9 @@ func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	methodsJSON, _ := json.Marshal(route.Methods)
-	authKeysJSON, _ := json.Marshal(route.AuthKeys)
+	// Convert to PostgreSQL arrays
+	methodsArray := pq.StringArray(route.Methods)
+	authKeysArray := pq.StringArray(route.AuthKeys)
 
 	query := `
 		UPDATE proxy_routes SET
@@ -263,9 +267,9 @@ func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request, id int) {
 	`
 
 	err := s.db.QueryRow(query,
-		route.Path, route.Target, string(methodsJSON), route.CacheEnabled, route.CacheTTL,
+		route.Path, route.Target, methodsArray, route.CacheEnabled, route.CacheTTL,
 		route.RateLimitEnabled, route.RateLimitRate, route.RateLimitBurst, route.RateLimitPeriod,
-		route.RateLimitPerClient, route.AuthRequired, string(authKeysJSON), route.ValidationEnabled,
+		route.RateLimitPerClient, route.AuthRequired, authKeysArray, route.ValidationEnabled,
 		route.ValidationRequestSchema, route.ValidationResponseSchema, route.Enabled, id,
 	).Scan(&route.UpdatedAt)
 
@@ -305,7 +309,7 @@ func (s *Server) getRoute(w http.ResponseWriter, r *http.Request, id int) {
 	`
 
 	var route ProxyRoute
-	var methods, authKeys string
+	var methods, authKeys pq.StringArray
 
 	err := s.db.QueryRow(query, id).Scan(
 		&route.ID, &route.Path, &route.Target, &methods, &route.CacheEnabled, &route.CacheTTL,
@@ -325,9 +329,9 @@ func (s *Server) getRoute(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	// Parse JSON arrays
-	json.Unmarshal([]byte(methods), &route.Methods)
-	json.Unmarshal([]byte(authKeys), &route.AuthKeys)
+	// Convert pq.StringArray to []string
+	route.Methods = []string(methods)
+	route.AuthKeys = []string(authKeys)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(route)
@@ -381,7 +385,7 @@ func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 	var keys []APIKey
 	for rows.Next() {
 		var key APIKey
-		var permissions string
+		var permissions pq.StringArray
 
 		err := rows.Scan(
 			&key.ID, &key.KeyValue, &key.Name, &permissions, &key.RateLimit,
@@ -392,8 +396,8 @@ func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Parse JSON array
-		json.Unmarshal([]byte(permissions), &key.Permissions)
+		// Convert pq.StringArray to []string
+		key.Permissions = []string(permissions)
 		keys = append(keys, key)
 	}
 
@@ -409,7 +413,8 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	permissionsJSON, _ := json.Marshal(key.Permissions)
+	// Convert to PostgreSQL array
+	permissionsArray := pq.StringArray(key.Permissions)
 
 	query := `
 		INSERT INTO api_keys (key_value, name, permissions, rate_limit, enabled, expires_at)
@@ -418,7 +423,7 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	`
 
 	err := s.db.QueryRow(query,
-		key.KeyValue, key.Name, string(permissionsJSON), key.RateLimit, key.Enabled, key.ExpiresAt,
+		key.KeyValue, key.Name, permissionsArray, key.RateLimit, key.Enabled, key.ExpiresAt,
 	).Scan(&key.ID, &key.CreatedAt, &key.UpdatedAt)
 
 	if err != nil {
@@ -440,7 +445,8 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	permissionsJSON, _ := json.Marshal(key.Permissions)
+	// Convert to PostgreSQL array
+	permissionsArray := pq.StringArray(key.Permissions)
 
 	query := `
 		UPDATE api_keys SET
@@ -451,7 +457,7 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	`
 
 	err := s.db.QueryRow(query,
-		key.KeyValue, key.Name, string(permissionsJSON), key.RateLimit, key.Enabled, key.ExpiresAt, id,
+		key.KeyValue, key.Name, permissionsArray, key.RateLimit, key.Enabled, key.ExpiresAt, id,
 	).Scan(&key.UpdatedAt)
 
 	if err != nil {
@@ -486,7 +492,7 @@ func (s *Server) getAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	`
 
 	var key APIKey
-	var permissions string
+	var permissions pq.StringArray
 
 	err := s.db.QueryRow(query, id).Scan(
 		&key.ID, &key.KeyValue, &key.Name, &permissions, &key.RateLimit,
@@ -503,8 +509,8 @@ func (s *Server) getAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	// Parse JSON array
-	json.Unmarshal([]byte(permissions), &key.Permissions)
+	// Convert pq.StringArray to []string
+	key.Permissions = []string(permissions)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(key)
