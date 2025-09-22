@@ -1,8 +1,38 @@
 -- PostgreSQL schema for Edge.link Admin API
 
+-- Tenants table for multi-tenant support
+CREATE TABLE IF NOT EXISTS tenants (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  domain VARCHAR(255) UNIQUE,
+  plan VARCHAR(50) DEFAULT 'free',
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Domains table for domain linking
+CREATE TABLE IF NOT EXISTS domains (
+  id SERIAL PRIMARY KEY,
+  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  domain VARCHAR(255) NOT NULL,
+  proxy_url VARCHAR(500) NOT NULL,
+  verified BOOLEAN DEFAULT false,
+  verify_token VARCHAR(255) NOT NULL,
+  ssl_enabled BOOLEAN DEFAULT false,
+  ssl_cert_path VARCHAR(500),
+  ssl_key_path VARCHAR(500),
+  enabled BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(tenant_id, domain)
+);
+
 -- Users table for authentication (optional for future use)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
+  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(255) NOT NULL,
@@ -14,6 +44,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Proxy routes configuration
 CREATE TABLE IF NOT EXISTS proxy_routes (
   id SERIAL PRIMARY KEY,
+  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
   path VARCHAR(255) NOT NULL,
   target VARCHAR(500) NOT NULL,
   methods TEXT[] DEFAULT '{"GET"}',
@@ -37,6 +68,7 @@ CREATE TABLE IF NOT EXISTS proxy_routes (
 -- API keys management
 CREATE TABLE IF NOT EXISTS api_keys (
   id SERIAL PRIMARY KEY,
+  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
   key_value VARCHAR(255) UNIQUE NOT NULL,
   name VARCHAR(255) NOT NULL,
   permissions TEXT[] DEFAULT '{}',
