@@ -152,10 +152,29 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check cache for GET requests
+	// Check cache for cacheable requests
 	cacheHit := false
-	if route.Cache.Enabled && r.Method == "GET" {
-		cacheKey := cache.GenerateKey(r.Method, r.URL.Path, r.URL.RawQuery)
+	var requestBody []byte
+	var cacheKey string
+	
+	if route.Cache.Enabled {
+		// Read request body for POST/PUT/PATCH requests to include in cache key
+		if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+			var err error
+			requestBody, err = io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+				s.metrics.RecordRouteMetric(route.Path, false, time.Since(start), true)
+				return
+			}
+			// Restore the body for downstream handlers
+			r.Body = io.NopCloser(bytes.NewReader(requestBody))
+			cacheKey = cache.GenerateKeyWithBody(r.Method, r.URL.Path, r.URL.RawQuery, requestBody)
+		} else {
+			cacheKey = cache.GenerateKey(r.Method, r.URL.Path, r.URL.RawQuery)
+		}
+		
+		// Check cache for all cacheable methods (GET is most common, but POST results can be cached too)
 		if cachedData, found := s.cache.Get(cacheKey); found {
 			w.Header().Set("X-Cache", "HIT")
 			w.Header().Set("Content-Type", "application/json")
@@ -175,11 +194,30 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		result, body, err := s.validator.ValidateRequest(route.Validation.RequestSchema, r)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Request validation error: %v", err), http.StatusInternalServerError)
-			s.metrics.RecordRouteMetric(route.Path, false, time.Since(start), true)
-			return
+		var result *validation.ValidationResult
+		var body []byte
+		var err error
+		
+		// Use already read body if available, otherwise read it
+		if requestBody != nil {
+			body = requestBody
+			if len(body) > 0 {
+				result, err = s.validator.ValidateJSON(route.Validation.RequestSchema, body)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("Request validation error: %v", err), http.StatusInternalServerError)
+					s.metrics.RecordRouteMetric(route.Path, false, time.Since(start), true)
+					return
+				}
+			} else {
+				result = &validation.ValidationResult{Valid: true}
+			}
+		} else {
+			result, body, err = s.validator.ValidateRequest(route.Validation.RequestSchema, r)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("Request validation error: %v", err), http.StatusInternalServerError)
+				s.metrics.RecordRouteMetric(route.Path, false, time.Since(start), true)
+				return
+			}
 		}
 
 		if !result.Valid {
@@ -194,16 +232,18 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Restore body
-		r.Body = io.NopCloser(bytes.NewReader(body))
+		// Restore body if we read it here
+		if requestBody == nil && body != nil {
+			r.Body = io.NopCloser(bytes.NewReader(body))
+		}
 	}
 
 	// Proxy the request
-	s.proxyRequest(w, r, route, start, cacheHit)
+	s.proxyRequest(w, r, route, start, cacheHit, cacheKey)
 }
 
 // proxyRequest performs the actual proxy operation
-func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *config.RouteConfig, start time.Time, cacheHit bool) {
+func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *config.RouteConfig, start time.Time, cacheHit bool, cacheKey string) {
 	// Parse target URL
 	target, err := url.Parse(route.Target)
 	if err != nil {
@@ -235,7 +275,7 @@ func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *co
 	}
 
 	// Wrap response writer to capture response for caching
-	wrapped := newCachingResponseWriter(w, route, s.cache, cache.GenerateKey(r.Method, r.URL.Path, r.URL.RawQuery))
+	wrapped := newCachingResponseWriter(w, route, s.cache, cacheKey)
 
 	// Execute the proxy request
 	proxy.ServeHTTP(wrapped, r)

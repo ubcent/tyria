@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -119,5 +120,97 @@ func TestGenerateKey(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("Expected %s, got %s", test.expected, result)
 		}
+	}
+}
+
+func TestGenerateKeyWithBody(t *testing.T) {
+	tests := []struct {
+		name           string
+		method         string
+		path           string
+		query          string
+		body           []byte
+		expectedPrefix string
+		hasBodyHash    bool
+	}{
+		{
+			name:           "GET request ignores body",
+			method:         "GET",
+			path:           "/api/users",
+			query:          "",
+			body:           []byte(`{"name": "test"}`),
+			expectedPrefix: "GET:/api/users",
+			hasBodyHash:    false,
+		},
+		{
+			name:           "POST request with body includes hash",
+			method:         "POST", 
+			path:           "/api/users",
+			query:          "",
+			body:           []byte(`{"name": "test"}`),
+			expectedPrefix: "POST:/api/users:body:",
+			hasBodyHash:    true,
+		},
+		{
+			name:           "PUT request with body includes hash",
+			method:         "PUT",
+			path:           "/api/users/1",
+			query:          "format=json",
+			body:           []byte(`{"name": "updated"}`),
+			expectedPrefix: "PUT:/api/users/1?format=json:body:",
+			hasBodyHash:    true,
+		},
+		{
+			name:           "POST request with empty body",
+			method:         "POST",
+			path:           "/api/users",
+			query:          "",
+			body:           []byte{},
+			expectedPrefix: "POST:/api/users",
+			hasBodyHash:    false,
+		},
+		{
+			name:           "PATCH request with body includes hash",
+			method:         "PATCH",
+			path:           "/api/users/1", 
+			query:          "",
+			body:           []byte(`{"status": "active"}`),
+			expectedPrefix: "PATCH:/api/users/1:body:",
+			hasBodyHash:    true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := GenerateKeyWithBody(test.method, test.path, test.query, test.body)
+			
+			if test.hasBodyHash {
+				if !strings.HasPrefix(result, test.expectedPrefix) {
+					t.Errorf("Expected result to start with %s, got %s", test.expectedPrefix, result)
+				}
+				if len(result) <= len(test.expectedPrefix) {
+					t.Errorf("Expected result to have hash suffix, got %s", result)
+				}
+			} else {
+				if result != test.expectedPrefix {
+					t.Errorf("Expected %s, got %s", test.expectedPrefix, result)
+				}
+			}
+		})
+	}
+	
+	// Test that same body produces same hash
+	body := []byte(`{"name": "test"}`)
+	key1 := GenerateKeyWithBody("POST", "/api/users", "", body)
+	key2 := GenerateKeyWithBody("POST", "/api/users", "", body)
+	if key1 != key2 {
+		t.Errorf("Expected same body to produce same key, got %s != %s", key1, key2)
+	}
+	
+	// Test that different bodies produce different hashes
+	body2 := []byte(`{"name": "different"}`)
+	key3 := GenerateKeyWithBody("POST", "/api/users", "", body2)
+	if key1 == key3 {
+		t.Errorf("Expected different bodies to produce different keys, both got %s", key1)
 	}
 }

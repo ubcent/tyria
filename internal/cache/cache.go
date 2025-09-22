@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"crypto/md5"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -205,4 +207,17 @@ func GenerateKey(method, path, query string) string {
 		return method + ":" + path
 	}
 	return method + ":" + path + "?" + query
+}
+
+// GenerateKeyWithBody generates a cache key including request body for POST/PUT requests
+func GenerateKeyWithBody(method, path, query string, body []byte) string {
+	baseKey := GenerateKey(method, path, query)
+	
+	// For POST, PUT, PATCH requests with body, include MD5 hash of body
+	if (method == "POST" || method == "PUT" || method == "PATCH") && len(body) > 0 {
+		hash := md5.Sum(body)
+		return baseKey + ":body:" + fmt.Sprintf("%x", hash)
+	}
+	
+	return baseKey
 }
