@@ -20,7 +20,7 @@ services:
       - "8080:8080"  # Proxy server
       - "9090:9090"  # Metrics server
     volumes:
-      - ./config.yaml:/config.yaml:ro  # Mount custom config if needed
+      - ./examples/config.yaml:/config.yaml:ro  # Mount example config
     environment:
       - LOG_LEVEL=info
     restart: unless-stopped

@@ -19,8 +19,8 @@ FROM gcr.io/distroless/static:nonroot
 # Copy the binary from builder stage
 COPY --from=builder /app/bin/proxy /proxy
 
-# Copy configuration
-COPY --from=builder /app/config.yaml /config.yaml
+# Copy configuration from examples
+COPY --from=builder /app/examples/config.yaml /config.yaml
 
 # Expose ports
 EXPOSE 8080 9090
