@@ -109,7 +109,7 @@ export default function OnboardingPage() {
                 </div>
                 <button
                   onClick={handleStep1Complete}
-                  disabled={!domain}
+                  disabled={!domain.trim()}
                   className="w-full btn btn-primary py-3 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create Proxy URL
