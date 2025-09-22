@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -11,12 +12,14 @@ import (
 
 // Config represents the main configuration for the proxy service
 type Config struct {
-	Server   ServerConfig   `yaml:"server" json:"server"`
-	Cache    CacheConfig    `yaml:"cache" json:"cache"`
-	Routes   []RouteConfig  `yaml:"routes" json:"routes"`
-	APIKeys  []APIKeyConfig `yaml:"api_keys" json:"api_keys"`
-	Logging  LoggingConfig  `yaml:"logging" json:"logging"`
-	Metrics  MetricsConfig  `yaml:"metrics" json:"metrics"`
+	Server       ServerConfig     `yaml:"server" json:"server"`
+	Database     DatabaseConfig   `yaml:"database" json:"database"`
+	Cache        CacheConfig      `yaml:"cache" json:"cache"`
+	Routes       []RouteConfig    `yaml:"routes" json:"routes"`
+	APIKeys      []APIKeyConfig   `yaml:"api_keys" json:"api_keys"`
+	Logging      LoggingConfig    `yaml:"logging" json:"logging"`
+	Metrics      MetricsConfig    `yaml:"metrics" json:"metrics"`
+	FeatureFlags FeatureFlagsConfig `yaml:"feature_flags" json:"feature_flags"`
 }
 
 // ServerConfig holds server-specific configuration
@@ -97,6 +100,29 @@ type MetricsConfig struct {
 	Port    int    `yaml:"port" json:"port"`
 }
 
+// DatabaseConfig holds database configuration
+type DatabaseConfig struct {
+	Host            string        `yaml:"host" json:"host"`
+	Port            int           `yaml:"port" json:"port"`
+	User            string        `yaml:"user" json:"user"`
+	Password        string        `yaml:"password" json:"password"`
+	Database        string        `yaml:"database" json:"database"`
+	SSLMode         string        `yaml:"ssl_mode" json:"ssl_mode"`
+	MaxOpenConns    int           `yaml:"max_open_conns" json:"max_open_conns"`
+	MaxIdleConns    int           `yaml:"max_idle_conns" json:"max_idle_conns"`
+	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime" json:"conn_max_lifetime"`
+}
+
+// FeatureFlagsConfig holds feature flag configuration
+type FeatureFlagsConfig struct {
+	MultiTenant      bool `yaml:"multi_tenant" json:"multi_tenant"`
+	DomainLinking    bool `yaml:"domain_linking" json:"domain_linking"`
+	UserAuth         bool `yaml:"user_auth" json:"user_auth"`
+	BillingEnabled   bool `yaml:"billing_enabled" json:"billing_enabled"`
+	EmailVerification bool `yaml:"email_verification" json:"email_verification"`
+	SSLProvisioning  bool `yaml:"ssl_provisioning" json:"ssl_provisioning"`
+}
+
 // LoadConfig loads configuration from a file
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -147,6 +173,35 @@ func (c *Config) setDefaults() {
 		c.Cache.CleanupPeriod = 10 * time.Minute
 	}
 
+	// Database defaults
+	if c.Database.Host == "" {
+		c.Database.Host = getEnvWithDefault("DB_HOST", "localhost")
+	}
+	if c.Database.Port == 0 {
+		c.Database.Port = getEnvIntWithDefault("DB_PORT", 5432)
+	}
+	if c.Database.User == "" {
+		c.Database.User = getEnvWithDefault("DB_USER", "edgelink")
+	}
+	if c.Database.Password == "" {
+		c.Database.Password = getEnvWithDefault("DB_PASSWORD", "edgelink")
+	}
+	if c.Database.Database == "" {
+		c.Database.Database = getEnvWithDefault("DB_NAME", "edgelink")
+	}
+	if c.Database.SSLMode == "" {
+		c.Database.SSLMode = getEnvWithDefault("DB_SSL_MODE", "disable")
+	}
+	if c.Database.MaxOpenConns == 0 {
+		c.Database.MaxOpenConns = getEnvIntWithDefault("DB_MAX_OPEN_CONNS", 25)
+	}
+	if c.Database.MaxIdleConns == 0 {
+		c.Database.MaxIdleConns = getEnvIntWithDefault("DB_MAX_IDLE_CONNS", 5)
+	}
+	if c.Database.ConnMaxLifetime == 0 {
+		c.Database.ConnMaxLifetime = 5 * time.Minute
+	}
+
 	if c.Logging.Level == "" {
 		c.Logging.Level = "info"
 	}
@@ -163,6 +218,14 @@ func (c *Config) setDefaults() {
 	if c.Metrics.Port == 0 {
 		c.Metrics.Port = 9090
 	}
+
+	// Feature flags from environment variables
+	c.FeatureFlags.MultiTenant = getEnvBoolWithDefault("FEATURE_MULTI_TENANT", false)
+	c.FeatureFlags.DomainLinking = getEnvBoolWithDefault("FEATURE_DOMAIN_LINKING", false)
+	c.FeatureFlags.UserAuth = getEnvBoolWithDefault("FEATURE_USER_AUTH", false)
+	c.FeatureFlags.BillingEnabled = getEnvBoolWithDefault("FEATURE_BILLING", false)
+	c.FeatureFlags.EmailVerification = getEnvBoolWithDefault("FEATURE_EMAIL_VERIFICATION", false)
+	c.FeatureFlags.SSLProvisioning = getEnvBoolWithDefault("FEATURE_SSL_PROVISIONING", false)
 }
 
 // Validate validates the configuration
@@ -194,4 +257,32 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// getEnvWithDefault gets an environment variable with a default value
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// getEnvIntWithDefault gets an environment variable as int with a default value
+func getEnvIntWithDefault(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvBoolWithDefault gets an environment variable as bool with a default value
+func getEnvBoolWithDefault(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
 }

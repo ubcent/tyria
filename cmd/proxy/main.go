@@ -12,7 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcent/edge.link/internal/config"
+	"github.com/ubcent/edge.link/internal/db"
+	"github.com/ubcent/edge.link/internal/logging"
 	"github.com/ubcent/edge.link/internal/proxy"
 )
 
@@ -44,16 +48,60 @@ func main() {
 		log.Fatalf("Invalid configuration: %v", err)
 	}
 
+	// Initialize logging
+	logger, err := logging.New(logging.Config{
+		Level:  cfg.Logging.Level,
+		Format: cfg.Logging.Format,
+		Output: cfg.Logging.Output,
+	})
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
+	// Initialize database connection (optional for now)
+	var database *db.DB
+	if cfg.Database.Host != "" {
+		database, err = db.New(db.Config{
+			Host:            cfg.Database.Host,
+			Port:            cfg.Database.Port,
+			User:            cfg.Database.User,
+			Password:        cfg.Database.Password,
+			Database:        cfg.Database.Database,
+			SSLMode:         cfg.Database.SSLMode,
+			MaxOpenConns:    cfg.Database.MaxOpenConns,
+			MaxIdleConns:    cfg.Database.MaxIdleConns,
+			ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
+		})
+		if err != nil {
+			logger.Warn("Failed to connect to database, running without DB", "error", err)
+		} else {
+			defer database.Close()
+		}
+	}
+
 	// Print loaded configuration (excluding sensitive data)
 	printConfig(cfg)
 
-	// Create proxy service
+	// Create chi router
+	r := chi.NewRouter()
+
+	// Add middleware
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
+
+	// Add health and version endpoints (database passed safely)
+	r.Get("/healthz", healthHandler(database))
+	r.Get("/version", versionHandler)
+
+	// Create proxy service and mount its handler
 	proxyService := proxy.New(cfg)
+	r.Mount("/", proxyService.Handler())
 
 	// Create HTTP server
 	server := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
-		Handler:      proxyService.Handler(),
+		Handler:      r,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,
@@ -62,8 +110,8 @@ func main() {
 	// Create metrics server if enabled
 	var metricsServer *http.Server
 	if cfg.Metrics.Enabled {
-		metricsMux := http.NewServeMux()
-		metricsMux.HandleFunc(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) {
+		metricsRouter := chi.NewRouter()
+		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) {
 			stats := proxyService.GetMetrics().GetStats()
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(stats); err != nil {
@@ -73,23 +121,25 @@ func main() {
 		
 		metricsServer = &http.Server{
 			Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),
-			Handler: metricsMux,
+			Handler: metricsRouter,
 		}
 	}
 
 	// Start servers
 	go func() {
-		log.Printf("Starting proxy server on %s", server.Addr)
+		logger.Info("Starting proxy server", "addr", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Proxy server failed: %v", err)
+			logger.Error("Proxy server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	if metricsServer != nil {
 		go func() {
-			log.Printf("Starting metrics server on %s", metricsServer.Addr)
+			logger.Info("Starting metrics server", "addr", metricsServer.Addr)
 			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("Metrics server failed: %v", err)
+				logger.Error("Metrics server failed", "error", err)
+				os.Exit(1)
 			}
 		}()
 	}
@@ -99,7 +149,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down servers...")
+	logger.Info("Shutting down servers...")
 
 	// Create a context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -107,17 +157,57 @@ func main() {
 
 	// Shutdown proxy server
 	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Proxy server shutdown error: %v", err)
+		logger.Error("Proxy server shutdown error", "error", err)
 	}
 
 	// Shutdown metrics server
 	if metricsServer != nil {
 		if err := metricsServer.Shutdown(ctx); err != nil {
-			log.Printf("Metrics server shutdown error: %v", err)
+			logger.Error("Metrics server shutdown error", "error", err)
 		}
 	}
 
-	log.Println("Servers stopped")
+	logger.Info("Servers stopped")
+}
+
+// healthHandler returns health status including database connectivity
+func healthHandler(database *db.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		health := map[string]interface{}{
+			"status":    "healthy",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"version":   version,
+		}
+
+		// Check database connectivity if database is available
+		if database != nil {
+			if err := database.Health(); err != nil {
+				health["status"] = "unhealthy"
+				health["database"] = "unhealthy"
+				health["error"] = err.Error()
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else {
+				health["database"] = "healthy"
+			}
+		} else {
+			health["database"] = "not_configured"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(health)
+	}
+}
+
+// versionHandler returns version information
+func versionHandler(w http.ResponseWriter, r *http.Request) {
+	versionInfo := map[string]interface{}{
+		"version":   version,
+		"timestamp": time.Now().Format(time.RFC3339),
+		"service":   "edge.link-proxy",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(versionInfo)
 }
 
 // printConfig prints the loaded configuration (excluding sensitive data)
