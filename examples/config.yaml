@@ -1,0 +1,90 @@
+server:
+  host: "localhost"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+
+cache:
+  default_ttl: "5m"
+  max_size: 104857600  # 100MB
+  cleanup_period: "10m"
+
+routes:
+  # Example: Proxy to JSONPlaceholder API
+  - path: "/api/v1/posts"
+    target: "https://jsonplaceholder.typicode.com"
+    methods: ["GET", "POST"]
+    cache:
+      enabled: true
+      ttl: "5m"
+    rate_limit:
+      enabled: true
+      rate: 100
+      burst: 10
+      period: "1m"
+      per_client: true
+    auth:
+      required: false
+    validation:
+      enabled: false
+
+  # Example: Authenticated route with rate limiting
+  - path: "/api/secure/"
+    target: "https://httpbin.org"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    cache:
+      enabled: true
+      ttl: "2m"
+    rate_limit:
+      enabled: true
+      rate: 50
+      burst: 5
+      period: "1m"
+      per_client: true
+    auth:
+      required: true
+      keys: ["demo-key-12345", "admin-key-67890"]
+    validation:
+      enabled: false
+
+  # Example: Public API with global rate limiting
+  - path: "/public/"
+    target: "https://api.github.com"
+    methods: ["GET"]
+    cache:
+      enabled: true
+      ttl: "10m"
+    rate_limit:
+      enabled: true
+      rate: 1000
+      burst: 100
+      period: "1h"
+      per_client: false
+    auth:
+      required: false
+    validation:
+      enabled: false
+
+api_keys:
+  - key: "demo-key-12345"
+    name: "demo-client"
+    permissions: ["proxy.*"]
+    rate_limit: 1000
+    enabled: true
+    
+  - key: "admin-key-67890"
+    name: "admin-client"
+    permissions: ["proxy.*", "admin.*"]
+    rate_limit: 5000
+    enabled: true
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+
+metrics:
+  enabled: true
+  path: "/metrics"
+  port: 9090
