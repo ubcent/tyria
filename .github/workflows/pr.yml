@@ -257,7 +257,7 @@ jobs:
         go-version: '1.24.0'
 
     - name: Run gosec security scanner
-      uses: securecodewarrior/github-action-gosec@master
+      uses: securego/gosec-action@v2
       with:
         args: './...'
 
