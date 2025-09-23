@@ -24,9 +24,9 @@ const (
 	defaultConfigPath = "config.yaml"
 	version           = "1.0.0"
 	// Default rate limiting values
-	defaultRateLimit  = 100
-	defaultBurst      = 10
-	defaultRPSLimit   = 1000
+	defaultRateLimit   = 100
+	defaultBurst       = 10
+	defaultRPSLimit    = 1000
 	defaultMetricsPort = 9090
 	defaultTestID      = 2
 )
