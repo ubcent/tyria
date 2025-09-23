@@ -21,12 +21,31 @@ import (
 	"github.com/ubcent/edge.link/internal/routes"
 )
 
+// ErrorResponse represents a JSON error response
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Message string `json:"message"`
+	Code    int    `json:"code"`
+}
+
 // Server represents the admin API server
 type Server struct {
 	db            *sql.DB
 	router        *mux.Router
 	apiKeysService *apikeys.Service
 	routesService *routes.Service
+}
+
+// writeJSONError writes a JSON formatted error response
+func (s *Server) writeJSONError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	errorResp := ErrorResponse{
+		Error:   http.StatusText(code),
+		Message: message,
+		Code:    code,
+	}
+	json.NewEncoder(w).Encode(errorResp)
 }
 
 // ProxyRoute represents a proxy route configuration
@@ -202,7 +221,7 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "Invalid route ID", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid route ID", http.StatusBadRequest)
 		return
 	}
 
@@ -231,7 +250,7 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.db.Query(query)
 	if err != nil {
 		log.Printf("Error querying routes: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -268,7 +287,7 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 	var route ProxyRoute
 	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -295,7 +314,7 @@ func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Printf("Error creating route: %v", err)
-		http.Error(w, "Failed to create route", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to create route", http.StatusInternalServerError)
 		return
 	}
 
@@ -308,7 +327,7 @@ func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request, id int) {
 	var route ProxyRoute
 	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -336,7 +355,7 @@ func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request, id int) {
 
 	if err != nil {
 		log.Printf("Error updating route: %v", err)
-		http.Error(w, "Failed to update route", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to update route", http.StatusInternalServerError)
 		return
 	}
 
@@ -350,7 +369,7 @@ func (s *Server) deleteRoute(w http.ResponseWriter, r *http.Request, id int) {
 	_, err := s.db.Exec("DELETE FROM proxy_routes WHERE id = $1", id)
 	if err != nil {
 		log.Printf("Error deleting route: %v", err)
-		http.Error(w, "Failed to delete route", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to delete route", http.StatusInternalServerError)
 		return
 	}
 
@@ -382,10 +401,10 @@ func (s *Server) getRoute(w http.ResponseWriter, r *http.Request, id int) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Route not found", http.StatusNotFound)
+			s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		} else {
 			log.Printf("Error querying route: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
 	}
@@ -413,7 +432,7 @@ func (s *Server) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "Invalid key ID", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid key ID", http.StatusBadRequest)
 		return
 	}
 
@@ -434,7 +453,7 @@ func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := s.apiKeysService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting API keys for tenant %d: %v", tenantID, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -460,13 +479,13 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	
 	var req CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	// Validate request
 	if req.Name == "" {
-		http.Error(w, "Name is required", http.StatusBadRequest)
+		s.writeJSONError(w, "Name is required", http.StatusBadRequest)
 		return
 	}
 
@@ -482,7 +501,7 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	fullKey, err := s.apiKeysService.Create(r.Context(), apiKey)
 	if err != nil {
 		log.Printf("Error creating API key for tenant %d: %v", tenantID, err)
-		http.Error(w, "Failed to create API key", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to create API key", http.StatusInternalServerError)
 		return
 	}
 
@@ -504,7 +523,7 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	var key APIKey
 	if err := json.NewDecoder(r.Body).Decode(&key); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -525,7 +544,7 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 
 	if err != nil {
 		log.Printf("Error updating API key: %v", err)
-		http.Error(w, "Failed to update API key", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to update API key", http.StatusInternalServerError)
 		return
 	}
 
@@ -541,7 +560,7 @@ func (s *Server) deleteAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	err := s.apiKeysService.Delete(r.Context(), id, tenantID)
 	if err != nil {
 		log.Printf("Error deleting API key %d for tenant %d: %v", id, tenantID, err)
-		http.Error(w, "Failed to delete API key", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to delete API key", http.StatusInternalServerError)
 		return
 	}
 
@@ -566,10 +585,10 @@ func (s *Server) getAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "API key not found", http.StatusNotFound)
+			s.writeJSONError(w, "API key not found", http.StatusNotFound)
 		} else {
 			log.Printf("Error querying API key: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
 	}
@@ -758,7 +777,7 @@ func (s *Server) handleV1Route(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "Invalid route ID", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid route ID", http.StatusBadRequest)
 		return
 	}
 
@@ -779,7 +798,7 @@ func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
 	routes, err := s.routesService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting routes for tenant %d: %v", tenantID, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -793,7 +812,7 @@ func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 	
 	var route models.Route
 	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -802,14 +821,14 @@ func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 
 	// Validate the route input
 	if err := s.validateRouteInput(&route); err != nil {
-		http.Error(w, fmt.Sprintf("Validation error: %v", err), http.StatusBadRequest)
+		s.writeJSONError(w, fmt.Sprintf("Validation error: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	// Create the route
 	if err := s.routesService.Create(r.Context(), &route); err != nil {
 		log.Printf("Error creating route for tenant %d: %v", tenantID, err)
-		http.Error(w, "Failed to create route", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to create route", http.StatusInternalServerError)
 		return
 	}
 
@@ -826,22 +845,22 @@ func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	existingRoute, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Route not found", http.StatusNotFound)
+			s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		} else {
 			log.Printf("Error getting route %d: %v", id, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	if existingRoute.TenantID != tenantID {
-		http.Error(w, "Route not found", http.StatusNotFound)
+		s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		return
 	}
 
 	var route models.Route
 	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
@@ -851,14 +870,14 @@ func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 
 	// Validate the route input
 	if err := s.validateRouteInput(&route); err != nil {
-		http.Error(w, fmt.Sprintf("Validation error: %v", err), http.StatusBadRequest)
+		s.writeJSONError(w, fmt.Sprintf("Validation error: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	// Update the route
 	if err := s.routesService.Update(r.Context(), &route); err != nil {
 		log.Printf("Error updating route %d for tenant %d: %v", id, tenantID, err)
-		http.Error(w, "Failed to update route", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to update route", http.StatusInternalServerError)
 		return
 	}
 
@@ -874,22 +893,22 @@ func (s *Server) deleteV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	existingRoute, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Route not found", http.StatusNotFound)
+			s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		} else {
 			log.Printf("Error getting route %d: %v", id, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	if existingRoute.TenantID != tenantID {
-		http.Error(w, "Route not found", http.StatusNotFound)
+		s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		return
 	}
 
 	if err := s.routesService.Delete(r.Context(), id, tenantID); err != nil {
 		log.Printf("Error deleting route %d for tenant %d: %v", id, tenantID, err)
-		http.Error(w, "Failed to delete route", http.StatusInternalServerError)
+		s.writeJSONError(w, "Failed to delete route", http.StatusInternalServerError)
 		return
 	}
 
@@ -903,17 +922,17 @@ func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	route, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Route not found", http.StatusNotFound)
+			s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		} else {
 			log.Printf("Error getting route %d: %v", id, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// Verify the route belongs to the tenant
 	if route.TenantID != tenantID {
-		http.Error(w, "Route not found", http.StatusNotFound)
+		s.writeJSONError(w, "Route not found", http.StatusNotFound)
 		return
 	}
 
