@@ -62,29 +62,45 @@ type SigninResponse struct {
 	Token   string       `json:"token"`
 }
 
+// writeJSONError writes a JSON formatted error response
+func (a *AuthServer) writeJSONError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	errorResp := struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+		Code    int    `json:"code"`
+	}{
+		Error:   http.StatusText(code),
+		Message: message,
+		Code:    code,
+	}
+	json.NewEncoder(w).Encode(errorResp)
+}
+
 // HandleSignup handles user registration
 func (a *AuthServer) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		a.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req SignupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		a.writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Validate input
 	if req.Email == "" || req.Password == "" || req.CompanyName == "" {
-		http.Error(w, "Email, password, and company name are required", http.StatusBadRequest)
+		a.writeJSONError(w, "Email, password, and company name are required", http.StatusBadRequest)
 		return
 	}
 
 	// Check if user already exists
 	_, err := a.userSvc.GetByEmail(r.Context(), req.Email)
 	if err == nil {
-		http.Error(w, "User already exists", http.StatusConflict)
+		a.writeJSONError(w, "User already exists", http.StatusConflict)
 		return
 	}
 
@@ -96,7 +112,7 @@ func (a *AuthServer) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := a.tenantSvc.Create(r.Context(), newTenant); err != nil {
-		http.Error(w, "Failed to create tenant", http.StatusInternalServerError)
+		a.writeJSONError(w, "Failed to create tenant", http.StatusInternalServerError)
 		return
 	}
 
@@ -108,14 +124,14 @@ func (a *AuthServer) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := a.userSvc.Create(r.Context(), newUser, req.Password); err != nil {
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		a.writeJSONError(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
 
 	// Generate JWT token
 	token, err := a.jwtManager.GenerateToken(newUser.ID, newUser.TenantID, newUser.Email, newUser.Role)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		a.writeJSONError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
@@ -147,33 +163,33 @@ func (a *AuthServer) HandleSignup(w http.ResponseWriter, r *http.Request) {
 // HandleSignin handles user authentication
 func (a *AuthServer) HandleSignin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		a.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req SigninRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		a.writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// Validate input
 	if req.Email == "" || req.Password == "" {
-		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		a.writeJSONError(w, "Email and password are required", http.StatusBadRequest)
 		return
 	}
 
 	// Authenticate user
 	user, err := a.userSvc.Authenticate(r.Context(), req.Email, req.Password)
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		a.writeJSONError(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
 	// Generate JWT token
 	token, err := a.jwtManager.GenerateToken(user.ID, user.TenantID, user.Email, user.Role)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		a.writeJSONError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
@@ -204,7 +220,7 @@ func (a *AuthServer) HandleSignin(w http.ResponseWriter, r *http.Request) {
 // HandleSignout handles user logout
 func (a *AuthServer) HandleSignout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		a.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -228,19 +244,19 @@ func (a *AuthServer) HandleSignout(w http.ResponseWriter, r *http.Request) {
 // HandleProfile returns the current user's profile
 func (a *AuthServer) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		a.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	userCtx := auth.GetUserContext(r.Context())
 	if userCtx == nil {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		a.writeJSONError(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
 
 	user, err := a.userSvc.GetByID(r.Context(), userCtx.UserID)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
+		a.writeJSONError(w, "User not found", http.StatusNotFound)
 		return
 	}
 
@@ -275,13 +291,13 @@ type ConfirmEmailRequest struct {
 // HandleConfirmEmail handles email confirmation (stub implementation)
 func (a *AuthServer) HandleConfirmEmail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		a.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req ConfirmEmailRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		a.writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
