@@ -67,6 +67,7 @@ type CachingPolicy struct {
 type RateLimitPolicy struct {
 	Enabled           bool `json:"enabled"`
 	RequestsPerMinute int  `json:"requests_per_minute"`
+	Burst             int  `json:"burst"`
 }
 
 // GetCachingPolicy parses the caching policy JSON

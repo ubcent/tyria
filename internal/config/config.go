@@ -17,6 +17,7 @@ type Config struct {
 	Server       ServerConfig       `yaml:"server" json:"server"`
 	Database     DatabaseConfig     `yaml:"database" json:"database"`
 	Cache        CacheConfig        `yaml:"cache" json:"cache"`
+	Redis        RedisConfig        `yaml:"redis" json:"redis"`
 	Routes       []RouteConfig      `yaml:"routes" json:"routes"`
 	APIKeys      []APIKeyConfig     `yaml:"api_keys" json:"api_keys"`
 	Logging      LoggingConfig      `yaml:"logging" json:"logging"`
@@ -38,6 +39,14 @@ type CacheConfig struct {
 	DefaultTTL    time.Duration `yaml:"default_ttl" json:"default_ttl"`
 	MaxSize       int64         `yaml:"max_size" json:"max_size"`
 	CleanupPeriod time.Duration `yaml:"cleanup_period" json:"cleanup_period"`
+}
+
+// RedisConfig holds Redis-specific configuration
+type RedisConfig struct {
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+	Addr     string `yaml:"addr" json:"addr"`
+	Password string `yaml:"password" json:"password"`
+	DB       int    `yaml:"db" json:"db"`
 }
 
 // RouteConfig defines a proxy route configuration
@@ -177,6 +186,16 @@ func (c *Config) setDefaults() {
 	if c.Cache.CleanupPeriod == 0 {
 		c.Cache.CleanupPeriod = 10 * time.Minute
 	}
+
+	// Redis defaults
+	if c.Redis.Addr == "" {
+		c.Redis.Addr = getEnvWithDefault("REDIS_ADDR", "localhost:6379")
+	}
+	if c.Redis.Password == "" {
+		c.Redis.Password = getEnvWithDefault("REDIS_PASSWORD", "")
+	}
+	c.Redis.DB = getEnvIntWithDefault("REDIS_DB", 0)
+	c.Redis.Enabled = getEnvBoolWithDefault("REDIS_ENABLED", false)
 
 	// Database defaults
 	if c.Database.Host == "" {
