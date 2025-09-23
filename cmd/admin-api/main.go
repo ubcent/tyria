@@ -3,14 +3,18 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ubcent/edge.link/internal/admin"
+	"github.com/ubcent/edge.link/internal/logging"
+	"github.com/ubcent/edge.link/internal/tracing"
 	_ "modernc.org/sqlite"
 )
 
@@ -32,6 +36,43 @@ func main() {
 		log.Println("Using in-memory SQLite database for testing")
 	}
 
+	// Initialize logging
+	logger, err := logging.New(logging.Config{
+		Level:  "info",
+		Format: "json",
+		Output: "stdout",
+	})
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
+	// Initialize tracing
+	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otlpEndpoint == "" {
+		otlpEndpoint = "http://localhost:4318"
+	}
+
+	tracingProvider, err := tracing.NewProvider(tracing.Config{
+		ServiceName:    "edgelink-admin-api",
+		ServiceVersion: "1.0.0",
+		Environment:    "development",
+		OTLPEndpoint:   otlpEndpoint,
+		Enabled:        true,
+	})
+	if err != nil {
+		logger.Warn().Err(err).Msg("Failed to initialize tracing, continuing without tracing")
+		tracingProvider = &tracing.Provider{} // Use no-op provider
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracingProvider.Shutdown(ctx); err != nil {
+				logger.Error().Err(err).Msg("Failed to shutdown tracing provider")
+			}
+		}()
+		logger.Info().Str("endpoint", otlpEndpoint).Msg("Tracing initialized")
+	}
+
 	// Create admin server
 	server, err := admin.NewServer(*databaseURL)
 	if err != nil {
@@ -42,7 +83,7 @@ func main() {
 	// Setup schema for SQLite if needed
 	if *useSQLite || *databaseURL == "file::memory:?cache=shared" {
 		if err := setupSQLiteSchema(server); err != nil {
-			log.Printf("Failed to setup SQLite schema: %v", err)
+			logger.Error().Err(err).Msg("Failed to setup SQLite schema")
 			// Close server explicitly since we are about to exit and deferred calls won't run after os.Exit
 			_ = server.Close()
 			os.Exit(1)
@@ -52,18 +93,18 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		if err := server.Start(*addr); err != nil {
-			log.Fatalf("Admin server failed: %v", err)
+			logger.Fatal().Err(err).Msg("Admin server failed")
 		}
 	}()
 
-	log.Printf("Admin API server started on %s", *addr)
+	logger.Info().Str("addr", *addr).Msg("Admin API server started")
 
 	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Admin API server stopped")
+	logger.Info().Msg("Admin API server stopped")
 }
 
 func setupSQLiteSchema(_ *admin.Server) error {
