@@ -95,8 +95,18 @@ func main() {
 	r.Get("/version", versionHandler)
 
 	// Create proxy service and mount its handler
-	proxyService := proxy.New(cfg)
-	r.Mount("/", proxyService.Handler())
+	var proxyService *proxy.Service
+	var dbProxyService *proxy.DBService
+	
+	if database != nil {
+		// Use database-driven proxy when database is available
+		dbProxyService = proxy.NewDBService(database.DB)
+		r.Mount("/", dbProxyService.Handler())
+	} else {
+		// Fall back to config-driven proxy
+		proxyService = proxy.New(cfg)
+		r.Mount("/", proxyService.Handler())
+	}
 
 	// Create HTTP server
 	server := &http.Server{
@@ -112,7 +122,16 @@ func main() {
 	if cfg.Metrics.Enabled {
 		metricsRouter := chi.NewRouter()
 		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) {
-			stats := proxyService.GetMetrics().GetStats()
+			var stats interface{}
+			if proxyService != nil {
+				stats = proxyService.GetMetrics().GetStats()
+			} else {
+				// For DB proxy, return basic health info for now
+				stats = map[string]interface{}{
+					"service": "db-proxy",
+					"status":  "healthy",
+				}
+			}
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode(stats); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
