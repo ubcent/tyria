@@ -17,10 +17,8 @@ export interface RouteFormData {
   cache_enabled: boolean;
   cache_ttl: number;
   rate_limit_enabled: boolean;
-  rate_limit_rate: number;
+  rate_limit_requests_per_minute: number;
   rate_limit_burst: number;
-  rate_limit_period: number;
-  rate_limit_per_client: boolean;
   auth_required: boolean;
   auth_keys: string[];
   validation_enabled: boolean;
@@ -40,10 +38,8 @@ export default function RouteForm({ route, onSubmit, loading = false }: RouteFor
       cache_enabled: route?.cache_enabled || false,
       cache_ttl: route?.cache_ttl || 300,
       rate_limit_enabled: route?.rate_limit_enabled || false,
-      rate_limit_rate: route?.rate_limit_rate || 100,
+      rate_limit_requests_per_minute: route?.rate_limit_requests_per_minute || 60,
       rate_limit_burst: route?.rate_limit_burst || 10,
-      rate_limit_period: route?.rate_limit_period || 60,
-      rate_limit_per_client: route?.rate_limit_per_client || true,
       auth_required: route?.auth_required || false,
       auth_keys: route?.auth_keys || [],
       validation_enabled: route?.validation_enabled || false,
@@ -174,17 +170,20 @@ export default function RouteForm({ route, onSubmit, loading = false }: RouteFor
           </label>
 
           {watchRateLimitEnabled && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="form-label">Rate (requests per period)</label>
+                <label className="form-label">Requests per minute</label>
                 <input
                   type="number"
                   min="1"
                   className="form-input"
-                  {...register('rate_limit_rate', { 
-                    min: { value: 1, message: 'Rate must be at least 1' }
+                  {...register('rate_limit_requests_per_minute', { 
+                    min: { value: 1, message: 'Requests per minute must be at least 1' }
                   })}
                 />
+                {errors.rate_limit_requests_per_minute && (
+                  <p className="mt-1 text-sm text-red-600">{errors.rate_limit_requests_per_minute.message}</p>
+                )}
               </div>
               <div>
                 <label className="form-label">Burst</label>
@@ -196,27 +195,9 @@ export default function RouteForm({ route, onSubmit, loading = false }: RouteFor
                     min: { value: 1, message: 'Burst must be at least 1' }
                   })}
                 />
-              </div>
-              <div>
-                <label className="form-label">Period (seconds)</label>
-                <input
-                  type="number"
-                  min="1"
-                  className="form-input"
-                  {...register('rate_limit_period', { 
-                    min: { value: 1, message: 'Period must be at least 1 second' }
-                  })}
-                />
-              </div>
-              <div className="md:col-span-3">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    {...register('rate_limit_per_client')}
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Per-client rate limiting</span>
-                </label>
+                {errors.rate_limit_burst && (
+                  <p className="mt-1 text-sm text-red-600">{errors.rate_limit_burst.message}</p>
+                )}
               </div>
             </div>
           )}

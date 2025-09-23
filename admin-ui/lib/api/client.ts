@@ -50,10 +50,8 @@ export interface ProxyRoute {
   cache_enabled: boolean;
   cache_ttl: number;
   rate_limit_enabled: boolean;
-  rate_limit_rate: number;
+  rate_limit_requests_per_minute: number;
   rate_limit_burst: number;
-  rate_limit_period: number;
-  rate_limit_per_client: boolean;
   auth_required: boolean;
   auth_keys: string[];
   validation_enabled: boolean;
