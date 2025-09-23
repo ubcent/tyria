@@ -3,6 +3,9 @@ FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
+# Install git for fetching dependencies
+RUN apk add --no-cache git
+
 # Copy source code
 COPY . .
 

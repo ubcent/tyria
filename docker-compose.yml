@@ -35,7 +35,7 @@ services:
     ports:
       - "3001:3001"  # Admin API
     environment:
-      - POSTGRES_URL=postgresql://edgelink:edgelink@postgres:5432/edgelink
+      - POSTGRES_URL=postgresql://edgelink:edgelink@postgres:5432/edgelink?sslmode=disable
     restart: unless-stopped
     depends_on:
       - postgres
