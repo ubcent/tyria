@@ -56,8 +56,9 @@ type Route struct {
 
 // CachingPolicy represents the caching configuration for a route
 type CachingPolicy struct {
-	Enabled    bool `json:"enabled"`
-	TTLSeconds int  `json:"ttl_seconds"`
+	Enabled     bool     `json:"enabled"`
+	TTLSeconds  int      `json:"ttl_seconds"`
+	VaryHeaders []string `json:"vary_headers"`
 }
 
 // RateLimitPolicy represents the rate limiting configuration for a route

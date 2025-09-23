@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -10,8 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"io"
+	"bytes"
 
 	"github.com/ubcent/edge.link/internal/apikeys"
+	"github.com/ubcent/edge.link/internal/cache"
 	"github.com/ubcent/edge.link/internal/customdomains"
 	"github.com/ubcent/edge.link/internal/models"
 	"github.com/ubcent/edge.link/internal/requestlogs"
@@ -27,10 +31,15 @@ type DBService struct {
 	apiKeysService *apikeys.Service
 	domainsService *customdomains.Service
 	logsService    *requestlogs.Service
+	cache          cache.Interface
+	keyBuilder     *cache.KeyBuilder
 }
 
 // NewDBService creates a new database-driven proxy service
 func NewDBService(db *sql.DB) *DBService {
+	// Initialize LRU cache as default
+	cacheInstance := cache.NewLRU(100*1024*1024, 5*time.Minute, 10*time.Minute) // 100MB cache, 5min TTL, 10min cleanup
+	
 	return &DBService{
 		db:             db,
 		routesService:  routes.NewService(db),
@@ -38,6 +47,22 @@ func NewDBService(db *sql.DB) *DBService {
 		apiKeysService: apikeys.NewService(db),
 		domainsService: customdomains.NewService(db),
 		logsService:    requestlogs.NewService(db),
+		cache:          cacheInstance,
+		keyBuilder:     cache.NewKeyBuilder(),
+	}
+}
+
+// NewDBServiceWithCache creates a new database-driven proxy service with custom cache
+func NewDBServiceWithCache(db *sql.DB, cacheImpl cache.Interface) *DBService {
+	return &DBService{
+		db:             db,
+		routesService:  routes.NewService(db),
+		tenantService:  tenant.NewService(db),
+		apiKeysService: apikeys.NewService(db),
+		domainsService: customdomains.NewService(db),
+		logsService:    requestlogs.NewService(db),
+		cache:          cacheImpl,
+		keyBuilder:     cache.NewKeyBuilder(),
 	}
 }
 
@@ -47,6 +72,10 @@ func (s *DBService) Handler() http.Handler {
 
 	// Health endpoint
 	mux.HandleFunc("/api/health", s.healthHandler)
+	
+	// Cache management endpoints
+	mux.HandleFunc("/api/cache/stats", s.cacheStatsHandler)
+	mux.HandleFunc("/api/cache/clear", s.cacheClearHandler)
 
 	// Proxy handler with tenant extraction
 	mux.HandleFunc("/", s.dbProxyHandler)
@@ -57,6 +86,7 @@ func (s *DBService) Handler() http.Handler {
 // dbProxyHandler handles proxy requests with database-driven routing
 func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
+	cacheStatus := cache.CacheStatusMiss
 	
 	// Resolve tenant from hostname or X-Tenant header
 	tenantID, err := s.resolveTenant(r)
@@ -88,7 +118,7 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 	
 	if route == nil {
 		http.Error(w, "No route found", http.StatusNotFound)
-		s.logRequest(tenantID, nil, r, start, http.StatusNotFound, 0, 0, "miss")
+		s.logRequest(tenantID, nil, r, start, http.StatusNotFound, 0, 0, string(cache.CacheStatusMiss))
 		return
 	}
 
@@ -99,16 +129,72 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusForbidden
 		}
 		http.Error(w, err.Error(), status)
-		s.logRequest(tenantID, &route.ID, r, start, status, 0, 0, "miss")
+		s.logRequest(tenantID, &route.ID, r, start, status, 0, 0, string(cache.CacheStatusMiss))
 		return
+	}
+
+	// Check cache if enabled and request is cacheable
+	var cacheKey string
+	var cachingPolicy *models.CachingPolicy
+	
+	if len(route.CachingPolicyJSON) > 0 {
+		cachingPolicy, err = route.GetCachingPolicy()
+		if err == nil && cachingPolicy.Enabled && cache.IsCacheable(r.Method) {
+			// Generate cache key
+			varyHeaders := s.extractVaryHeaders(r, cachingPolicy.VaryHeaders)
+			
+			if r.Method == "GET" || r.Method == "HEAD" {
+				cacheKey = s.keyBuilder.GenerateKey(tenantID, route.Name, r.Method, r.URL.Path, r.URL.RawQuery, varyHeaders)
+			} else {
+				// For non-GET/HEAD, read body for cache key (though they aren't cached, this prepares for future)
+				requestBody, err := io.ReadAll(r.Body)
+				if err == nil {
+					r.Body = io.NopCloser(bytes.NewReader(requestBody))
+					cacheKey = s.keyBuilder.GenerateKeyWithBody(tenantID, route.Name, r.Method, r.URL.Path, r.URL.RawQuery, requestBody, varyHeaders)
+				}
+			}
+			
+			// Try to get from cache
+			if cacheKey != "" {
+				if cachedData, found := s.cache.Get(cacheKey); found {
+					w.Header().Set("X-Cache-Status", string(cache.CacheStatusHit))
+					w.Header().Set("Content-Type", "application/json")
+					w.Write(cachedData)
+					cacheStatus = cache.CacheStatusHit
+					
+					// Log cache hit
+					s.logRequest(tenantID, &route.ID, r, start, http.StatusOK, s.calculateRequestSize(r), int64(len(cachedData)), string(cacheStatus))
+					return
+				}
+			}
+		} else {
+			cacheStatus = cache.CacheStatusBypass
+		}
+	} else {
+		cacheStatus = cache.CacheStatusBypass
 	}
 
 	// Forward request
 	bytesIn := s.calculateRequestSize(r)
-	responseStatus, bytesOut := s.forwardRequest(w, r, route, pathParams)
+	responseStatus, bytesOut, responseData := s.forwardRequestWithCaching(w, r, route, pathParams, cachingPolicy, cacheKey)
+	
+	// Cache successful responses if caching is enabled
+	if cachingPolicy != nil && cachingPolicy.Enabled && cacheKey != "" && 
+		cache.IsCacheable(r.Method) && responseStatus >= 200 && responseStatus < 300 && 
+		len(responseData) > 0 {
+		
+		ttl := time.Duration(cachingPolicy.TTLSeconds) * time.Second
+		if ttl == 0 {
+			ttl = 5 * time.Minute // Default TTL
+		}
+		s.cache.SetWithTTL(cacheKey, responseData, ttl)
+	}
+	
+	// Set cache status header
+	w.Header().Set("X-Cache-Status", string(cacheStatus))
 	
 	// Log request
-	s.logRequest(tenantID, &route.ID, r, start, responseStatus, bytesIn, bytesOut, "miss")
+	s.logRequest(tenantID, &route.ID, r, start, responseStatus, bytesIn, bytesOut, string(cacheStatus))
 }
 
 // resolveTenant resolves tenant ID from hostname (custom domain) or X-Tenant header
@@ -295,8 +381,8 @@ func (s *DBService) enforceBasicAuth(route *models.Route, r *http.Request, tenan
 	return fmt.Errorf("basic authentication not implemented")
 }
 
-// forwardRequest forwards the request to the upstream URL
-func (s *DBService) forwardRequest(w http.ResponseWriter, r *http.Request, route *models.Route, pathParams map[string]string) (int, int64) {
+// forwardRequestWithCaching forwards the request to the upstream URL and captures response for caching
+func (s *DBService) forwardRequestWithCaching(w http.ResponseWriter, r *http.Request, route *models.Route, pathParams map[string]string, cachingPolicy *models.CachingPolicy, cacheKey string) (int, int64, []byte) {
 	// Substitute path parameters in upstream URL
 	upstreamURLStr := route.UpstreamURL
 	for paramName, paramValue := range pathParams {
@@ -307,14 +393,19 @@ func (s *DBService) forwardRequest(w http.ResponseWriter, r *http.Request, route
 	upstreamURL, err := url.Parse(upstreamURLStr)
 	if err != nil {
 		http.Error(w, "Invalid upstream URL", http.StatusInternalServerError)
-		return http.StatusInternalServerError, 0
+		return http.StatusInternalServerError, 0, nil
 	}
 
 	// Create reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
 
-	// Track response metrics
-	responseWriter := &responseTracker{ResponseWriter: w, statusCode: http.StatusOK}
+	// Track response metrics and capture response data for caching
+	responseWriter := &cachingResponseTracker{
+		ResponseWriter: w, 
+		statusCode:     http.StatusOK,
+		captureBody:    cachingPolicy != nil && cachingPolicy.Enabled && cache.IsCacheable(r.Method),
+		buffer:         &bytes.Buffer{},
+	}
 
 	// Customize director to modify request
 	originalDirector := proxy.Director
@@ -344,7 +435,34 @@ func (s *DBService) forwardRequest(w http.ResponseWriter, r *http.Request, route
 	// Execute proxy request
 	proxy.ServeHTTP(responseWriter, r)
 
-	return responseWriter.statusCode, responseWriter.bytesWritten
+	responseData := responseWriter.buffer.Bytes()
+	return responseWriter.statusCode, responseWriter.bytesWritten, responseData
+}
+
+// cachingResponseTracker tracks response metrics and captures response data for caching
+type cachingResponseTracker struct {
+	http.ResponseWriter
+	statusCode   int
+	bytesWritten int64
+	captureBody  bool
+	buffer       *bytes.Buffer
+}
+
+func (crt *cachingResponseTracker) WriteHeader(statusCode int) {
+	crt.statusCode = statusCode
+	crt.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (crt *cachingResponseTracker) Write(data []byte) (int, error) {
+	n, err := crt.ResponseWriter.Write(data)
+	crt.bytesWritten += int64(n)
+	
+	// Capture response data for caching if enabled and status is successful
+	if crt.captureBody && crt.statusCode >= 200 && crt.statusCode < 300 {
+		crt.buffer.Write(data)
+	}
+	
+	return n, err
 }
 
 // responseTracker tracks response metrics
@@ -363,6 +481,17 @@ func (rt *responseTracker) Write(data []byte) (int, error) {
 	n, err := rt.ResponseWriter.Write(data)
 	rt.bytesWritten += int64(n)
 	return n, err
+}
+
+// extractVaryHeaders extracts the specified vary headers from the request
+func (s *DBService) extractVaryHeaders(r *http.Request, varyHeaders []string) map[string]string {
+	headers := make(map[string]string)
+	for _, headerName := range varyHeaders {
+		if value := r.Header.Get(headerName); value != "" {
+			headers[headerName] = value
+		}
+	}
+	return headers
 }
 
 // calculateRequestSize calculates the size of the incoming request
@@ -434,4 +563,26 @@ func (s *DBService) getClientIP(r *http.Request) string {
 func (s *DBService) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s", "service": "db-proxy"}`, time.Now().Format(time.RFC3339))
+}
+
+// cacheStatsHandler returns cache statistics
+func (s *DBService) cacheStatsHandler(w http.ResponseWriter, r *http.Request) {
+	stats := s.cache.Stats()
+	w.Header().Set("Content-Type", "application/json")
+	
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		http.Error(w, "Failed to encode cache stats", http.StatusInternalServerError)
+	}
+}
+
+// cacheClearHandler clears the cache
+func (s *DBService) cacheClearHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	s.cache.Clear()
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"message": "Cache cleared successfully", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
 }

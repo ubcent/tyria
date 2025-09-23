@@ -18,8 +18,8 @@ func (e *Entry) IsExpired() bool {
 	return time.Now().After(e.ExpiresAt)
 }
 
-// Cache provides a thread-safe in-memory cache with TTL support
-type Cache struct {
+// LRUCache provides a thread-safe in-memory cache with TTL support
+type LRUCache struct {
 	mu       sync.RWMutex
 	entries  map[string]*Entry
 	maxSize  int64
@@ -28,9 +28,9 @@ type Cache struct {
 	stopCh   chan struct{}
 }
 
-// New creates a new cache instance
-func New(maxSize int64, defaultTTL time.Duration, cleanupPeriod time.Duration) *Cache {
-	c := &Cache{
+// NewLRU creates a new LRU cache instance
+func NewLRU(maxSize int64, defaultTTL time.Duration, cleanupPeriod time.Duration) *LRUCache {
+	c := &LRUCache{
 		entries:    make(map[string]*Entry),
 		maxSize:    maxSize,
 		defaultTTL: defaultTTL,
@@ -43,8 +43,13 @@ func New(maxSize int64, defaultTTL time.Duration, cleanupPeriod time.Duration) *
 	return c
 }
 
+// New creates a new LRU cache instance (backward compatibility)
+func New(maxSize int64, defaultTTL time.Duration, cleanupPeriod time.Duration) *LRUCache {
+	return NewLRU(maxSize, defaultTTL, cleanupPeriod)
+}
+
 // Get retrieves a value from the cache
-func (c *Cache) Get(key string) ([]byte, bool) {
+func (c *LRUCache) Get(key string) ([]byte, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -62,12 +67,12 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 }
 
 // Set stores a value in the cache with the default TTL
-func (c *Cache) Set(key string, value []byte) bool {
+func (c *LRUCache) Set(key string, value []byte) bool {
 	return c.SetWithTTL(key, value, c.defaultTTL)
 }
 
 // SetWithTTL stores a value in the cache with a specific TTL
-func (c *Cache) SetWithTTL(key string, value []byte, ttl time.Duration) bool {
+func (c *LRUCache) SetWithTTL(key string, value []byte, ttl time.Duration) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -102,7 +107,7 @@ func (c *Cache) SetWithTTL(key string, value []byte, ttl time.Duration) bool {
 }
 
 // Delete removes a value from the cache
-func (c *Cache) Delete(key string) {
+func (c *LRUCache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -113,7 +118,7 @@ func (c *Cache) Delete(key string) {
 }
 
 // Clear removes all entries from the cache
-func (c *Cache) Clear() {
+func (c *LRUCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -122,21 +127,21 @@ func (c *Cache) Clear() {
 }
 
 // Size returns the current size of the cache in bytes
-func (c *Cache) Size() int64 {
+func (c *LRUCache) Size() int64 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.size
 }
 
 // Len returns the number of entries in the cache
-func (c *Cache) Len() int {
+func (c *LRUCache) Len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.entries)
 }
 
 // Stats returns cache statistics
-func (c *Cache) Stats() Stats {
+func (c *LRUCache) Stats() Stats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -164,12 +169,12 @@ type Stats struct {
 }
 
 // Stop stops the cache cleanup goroutine
-func (c *Cache) Stop() {
+func (c *LRUCache) Stop() {
 	close(c.stopCh)
 }
 
 // startCleanup starts a goroutine that periodically removes expired entries
-func (c *Cache) startCleanup(period time.Duration) {
+func (c *LRUCache) startCleanup(period time.Duration) {
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
 
@@ -184,14 +189,14 @@ func (c *Cache) startCleanup(period time.Duration) {
 }
 
 // cleanupExpired removes expired entries from the cache
-func (c *Cache) cleanupExpired() {
+func (c *LRUCache) cleanupExpired() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.cleanupExpiredLocked()
 }
 
 // cleanupExpiredLocked removes expired entries (must be called with lock held)
-func (c *Cache) cleanupExpiredLocked() {
+func (c *LRUCache) cleanupExpiredLocked() {
 	now := time.Now()
 	for key, entry := range c.entries {
 		if now.After(entry.ExpiresAt) {
@@ -221,3 +226,6 @@ func GenerateKeyWithBody(method, path, query string, body []byte) string {
 	
 	return baseKey
 }
+
+// Ensure LRUCache implements Interface
+var _ Interface = (*LRUCache)(nil)

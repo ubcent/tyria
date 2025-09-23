@@ -22,7 +22,7 @@ import (
 // Service represents the proxy service
 type Service struct {
 	config    *config.Config
-	cache     *cache.Cache
+	cache     cache.Interface
 	auth      *auth.Manager
 	limiter   *ratelimit.Limiter
 	metrics   *metrics.Metrics
@@ -304,17 +304,17 @@ type cachingResponseWriter struct {
 	http.ResponseWriter
 	buffer     *bytes.Buffer
 	route      *config.RouteConfig
-	cache      *cache.Cache
+	cache      cache.Interface
 	cacheKey   string
 	statusCode int
 }
 
-func newCachingResponseWriter(w http.ResponseWriter, route *config.RouteConfig, cache *cache.Cache, cacheKey string) *cachingResponseWriter {
+func newCachingResponseWriter(w http.ResponseWriter, route *config.RouteConfig, cacheImpl cache.Interface, cacheKey string) *cachingResponseWriter {
 	return &cachingResponseWriter{
 		ResponseWriter: w,
 		buffer:         &bytes.Buffer{},
 		route:          route,
-		cache:          cache,
+		cache:          cacheImpl,
 		cacheKey:       cacheKey,
 		statusCode:     200, // Default status code
 	}
