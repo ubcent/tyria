@@ -14,12 +14,16 @@ import (
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
+	
+	"github.com/ubcent/edge.link/internal/apikeys"
+	"github.com/ubcent/edge.link/internal/models"
 )
 
 // Server represents the admin API server
 type Server struct {
-	db     *sql.DB
-	router *mux.Router
+	db            *sql.DB
+	router        *mux.Router
+	apiKeysService *apikeys.Service
 }
 
 // ProxyRoute represents a proxy route configuration
@@ -58,6 +62,20 @@ type APIKey struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+// CreateAPIKeyRequest represents the request to create an API key
+type CreateAPIKeyRequest struct {
+	Name string `json:"name"`
+}
+
+// CreateAPIKeyResponse represents the response when creating an API key
+type CreateAPIKeyResponse struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Key       string    `json:"key"` // The full key is only returned once
+	Prefix    string    `json:"prefix"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // DashboardStats represents dashboard statistics
 type DashboardStats struct {
 	TotalRequests       int64   `json:"total_requests"`
@@ -87,8 +105,9 @@ func NewServer(databaseURL string) (*Server, error) {
 	}
 
 	server := &Server{
-		db:     db,
-		router: mux.NewRouter(),
+		db:             db,
+		router:         mux.NewRouter(),
+		apiKeysService: apikeys.NewService(db),
 	}
 
 	server.setupRoutes()
@@ -119,7 +138,12 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/routes", s.handleRoutes).Methods("GET", "POST", "OPTIONS")
 	api.HandleFunc("/routes/{id}", s.handleRoute).Methods("GET", "PUT", "DELETE", "OPTIONS")
 
-	// API Keys management
+	// API Keys management - v1 endpoints
+	v1 := api.PathPrefix("/v1").Subrouter()
+	v1.HandleFunc("/api-keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
+	v1.HandleFunc("/api-keys/{id}", s.handleAPIKey).Methods("DELETE", "OPTIONS")
+	
+	// Legacy API Keys management (for backward compatibility)
 	api.HandleFunc("/keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	api.HandleFunc("/keys/{id}", s.handleAPIKey).Methods("GET", "PUT", "DELETE", "OPTIONS")
 
@@ -129,6 +153,14 @@ func (s *Server) setupRoutes() {
 
 	// Health check
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
+}
+
+// getTenantID extracts tenant ID from request context
+// For now, we'll use a hardcoded tenant ID (1) since auth is not fully implemented
+// In a real implementation, this would come from the authenticated user context
+func (s *Server) getTenantID(r *http.Request) int {
+	// TODO: Extract from authenticated user context
+	return 1
 }
 
 // corsMiddleware adds CORS headers
@@ -387,75 +419,77 @@ func (s *Server) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getAPIKeys retrieves all API keys
+// getAPIKeys retrieves all API keys for the tenant
 func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
-	query := `
-		SELECT id, key_value, name, permissions, rate_limit, enabled, expires_at, created_at, updated_at
-		FROM api_keys
-		ORDER BY created_at DESC
-	`
-
-	rows, err := s.db.Query(query)
+	tenantID := s.getTenantID(r)
+	
+	keys, err := s.apiKeysService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
-		log.Printf("Error querying API keys: %v", err)
+		log.Printf("Error getting API keys for tenant %d: %v", tenantID, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
 
-	var keys []APIKey
-	for rows.Next() {
-		var key APIKey
-		var permissions pq.StringArray
-
-		err := rows.Scan(
-			&key.ID, &key.KeyValue, &key.Name, &permissions, &key.RateLimit,
-			&key.Enabled, &key.ExpiresAt, &key.CreatedAt, &key.UpdatedAt,
-		)
-		if err != nil {
-			log.Printf("Error scanning API key: %v", err)
-			continue
-		}
-
-		// Convert pq.StringArray to []string
-		key.Permissions = []string(permissions)
-		keys = append(keys, key)
+	// Convert to response format (don't include the hash)
+	var response []map[string]interface{}
+	for _, key := range keys {
+		response = append(response, map[string]interface{}{
+			"id":         key.ID,
+			"name":       key.Name,
+			"prefix":     key.Prefix, // Only show the prefix, not the full key
+			"created_at": key.CreatedAt,
+			"updated_at": key.UpdatedAt,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(keys)
+	json.NewEncoder(w).Encode(response)
 }
 
 // createAPIKey creates a new API key
 func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
-	var key APIKey
-	if err := json.NewDecoder(r.Body).Decode(&key); err != nil {
+	tenantID := s.getTenantID(r)
+	
+	var req CreateAPIKeyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Convert to PostgreSQL array
-	permissionsArray := pq.StringArray(key.Permissions)
+	// Validate request
+	if req.Name == "" {
+		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
 
-	query := `
-		INSERT INTO api_keys (key_value, name, permissions, rate_limit, enabled, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, created_at, updated_at
-	`
+	// TODO: Implement rate limiting by user/tenant here
+	// For now, we'll skip rate limiting implementation
 
-	err := s.db.QueryRow(query,
-		key.KeyValue, key.Name, permissionsArray, key.RateLimit, key.Enabled, key.ExpiresAt,
-	).Scan(&key.ID, &key.CreatedAt, &key.UpdatedAt)
+	// Create the API key
+	apiKey := &models.APIKey{
+		TenantID: tenantID,
+		Name:     req.Name,
+	}
 
+	fullKey, err := s.apiKeysService.Create(r.Context(), apiKey)
 	if err != nil {
-		log.Printf("Error creating API key: %v", err)
+		log.Printf("Error creating API key for tenant %d: %v", tenantID, err)
 		http.Error(w, "Failed to create API key", http.StatusInternalServerError)
 		return
 	}
 
+	// Return the response with full key (only returned once)
+	response := CreateAPIKeyResponse{
+		ID:        apiKey.ID,
+		Name:      apiKey.Name,
+		Key:       fullKey, // Full key returned only once
+		Prefix:    apiKey.Prefix,
+		CreatedAt: apiKey.CreatedAt,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(key)
+	json.NewEncoder(w).Encode(response)
 }
 
 // updateAPIKey updates an existing API key
@@ -494,9 +528,11 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 
 // deleteAPIKey deletes an API key
 func (s *Server) deleteAPIKey(w http.ResponseWriter, r *http.Request, id int) {
-	_, err := s.db.Exec("DELETE FROM api_keys WHERE id = $1", id)
+	tenantID := s.getTenantID(r)
+	
+	err := s.apiKeysService.Delete(r.Context(), id, tenantID)
 	if err != nil {
-		log.Printf("Error deleting API key: %v", err)
+		log.Printf("Error deleting API key %d for tenant %d: %v", id, tenantID, err)
 		http.Error(w, "Failed to delete API key", http.StatusInternalServerError)
 		return
 	}

@@ -30,8 +30,12 @@ func (s *Service) Create(ctx context.Context, apiKey *models.APIKey) (string, er
 		return "", fmt.Errorf("failed to generate API key: %w", err)
 	}
 
-	// Extract prefix (first 20 characters for display)
-	apiKey.Prefix = fullKey[:20] + "..."
+	// Extract prefix from prefix.key format (e.g., "el_abc123.def456" -> "el_abc123")
+	dotIndex := strings.Index(fullKey, ".")
+	if dotIndex == -1 {
+		return "", fmt.Errorf("invalid key format generated")
+	}
+	apiKey.Prefix = fullKey[:dotIndex]
 
 	// Hash the full key for storage
 	hashedKey, err := bcrypt.GenerateFromPassword([]byte(fullKey), bcrypt.DefaultCost)
@@ -90,11 +94,12 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.APIK
 
 // ValidateKey validates an API key and returns the associated key info
 func (s *Service) ValidateKey(ctx context.Context, keyValue string) (*models.APIKey, error) {
-	// Extract prefix from the key
-	var prefix string
-	if len(keyValue) >= 20 {
-		prefix = keyValue[:20] + "..."
+	// Extract prefix from prefix.key format (e.g., "el_abc123.def456" -> "el_abc123")
+	dotIndex := strings.Index(keyValue, ".")
+	if dotIndex == -1 {
+		return nil, fmt.Errorf("invalid API key format")
 	}
+	prefix := keyValue[:dotIndex]
 
 	query := `
 		SELECT id, tenant_id, name, prefix, hash, last_used_at, created_at, updated_at
@@ -142,17 +147,30 @@ func (s *Service) Delete(ctx context.Context, id int, tenantID int) error {
 	return nil
 }
 
-// generateAPIKey generates a secure random API key
+// generateAPIKey generates a secure random API key in prefix.key format
 func (s *Service) generateAPIKey() (string, error) {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
+	// Generate random bytes for the key portion
+	keyBytes := make([]byte, 32)
+	if _, err := rand.Read(keyBytes); err != nil {
 		return "", err
 	}
 	
-	key := base64.URLEncoding.EncodeToString(bytes)
+	// Generate random bytes for the prefix (shorter, for fast lookup)
+	prefixBytes := make([]byte, 8)
+	if _, err := rand.Read(prefixBytes); err != nil {
+		return "", err
+	}
+	
+	// Encode both parts
+	prefix := base64.URLEncoding.EncodeToString(prefixBytes)
+	key := base64.URLEncoding.EncodeToString(keyBytes)
+	
 	// Remove padding and make URL-safe
+	prefix = strings.TrimRight(prefix, "=")
 	key = strings.TrimRight(key, "=")
-	return "el_" + key, nil
+	
+	// Return in prefix.key format as specified
+	return fmt.Sprintf("el_%s.%s", prefix, key), nil
 }
 
 // updateLastUsed updates the last used timestamp for an API key
