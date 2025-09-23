@@ -11,6 +11,22 @@ const api = axios.create({
   },
 });
 
+// Add response interceptor for handling 401/403 errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized - redirect to login or show auth error
+      console.error('Unauthorized access - please login');
+      // In a real app, you might redirect to login page here
+    } else if (error.response?.status === 403) {
+      // Handle forbidden - show permission error
+      console.error('Forbidden - insufficient permissions');
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Types
 export interface ProxyRoute {
   id: number;
@@ -36,14 +52,22 @@ export interface ProxyRoute {
 
 export interface ApiKey {
   id: number;
-  key_value: string;
   name: string;
-  permissions: string[];
-  rate_limit: number;
-  enabled: boolean;
-  expires_at?: string;
+  prefix: string;  // Only the prefix is returned for listing
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateApiKeyRequest {
+  name: string;
+}
+
+export interface CreateApiKeyResponse {
+  id: number;
+  name: string;
+  key: string;  // Full key returned only once
+  prefix: string;
+  created_at: string;
 }
 
 export interface DashboardStats {
@@ -92,27 +116,17 @@ export const routesApi = {
 // API Keys API
 export const apiKeysApi = {
   getAll: async (): Promise<ApiKey[]> => {
-    const response = await api.get('/api/keys');
+    const response = await api.get('/api/v1/api-keys');
     return response.data;
   },
 
-  getById: async (id: number): Promise<ApiKey> => {
-    const response = await api.get(`/api/keys/${id}`);
-    return response.data;
-  },
-
-  create: async (key: Omit<ApiKey, 'id' | 'created_at' | 'updated_at'>): Promise<ApiKey> => {
-    const response = await api.post('/api/keys', key);
-    return response.data;
-  },
-
-  update: async (id: number, key: Partial<ApiKey>): Promise<ApiKey> => {
-    const response = await api.put(`/api/keys/${id}`, key);
+  create: async (request: CreateApiKeyRequest): Promise<CreateApiKeyResponse> => {
+    const response = await api.post('/api/v1/api-keys', request);
     return response.data;
   },
 
   delete: async (id: number): Promise<void> => {
-    await api.delete(`/api/keys/${id}`);
+    await api.delete(`/api/v1/api-keys/${id}`);
   },
 };
 
