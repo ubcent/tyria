@@ -297,8 +297,14 @@ func (s *DBService) enforceBasicAuth(route *models.Route, r *http.Request, tenan
 
 // forwardRequest forwards the request to the upstream URL
 func (s *DBService) forwardRequest(w http.ResponseWriter, r *http.Request, route *models.Route, pathParams map[string]string) (int, int64) {
+	// Substitute path parameters in upstream URL
+	upstreamURLStr := route.UpstreamURL
+	for paramName, paramValue := range pathParams {
+		upstreamURLStr = strings.ReplaceAll(upstreamURLStr, "{"+paramName+"}", paramValue)
+	}
+	
 	// Parse upstream URL
-	upstreamURL, err := url.Parse(route.UpstreamURL)
+	upstreamURL, err := url.Parse(upstreamURLStr)
 	if err != nil {
 		http.Error(w, "Invalid upstream URL", http.StatusInternalServerError)
 		return http.StatusInternalServerError, 0
