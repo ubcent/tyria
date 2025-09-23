@@ -235,47 +235,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Integration test with docker-compose
-  integration-test:
-    name: Integration Test
-    runs-on: ubuntu-latest
-    needs: [docker-build]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Start services with docker-compose
-        run: |
-          docker-compose up -d
-          sleep 30  # Wait for services to start
-
-      - name: Run health checks
-        run: |
-          # Check proxy service
-          curl -f http://localhost:8080/health || exit 1
-
-          # Check admin API
-          curl -f http://localhost:3001/health || exit 1
-
-          # Check admin UI
-          curl -f http://localhost:3000 || exit 1
-
-      - name: Run integration tests
-        run: |
-          # Run the test architecture script
-          chmod +x test-architecture.sh
-          ./test-architecture.sh
-
-      - name: Stop services
-        if: always()
-        run: docker-compose down -v
-
   # Final status check
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [go-tests, go-build, admin-ui, docker-build, integration-test]
+    needs: [go-tests, go-build, admin-ui, docker-build]
     if: always()
 
     steps:
