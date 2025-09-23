@@ -1,10 +1,11 @@
+---
 name: "CodeQL Security Analysis"
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
   schedule:
     - cron: '30 1 * * 0'  # Weekly on Sunday at 1:30 AM UTC
 
@@ -20,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'go', 'javascript' ]
+        language: ['go', 'javascript']
 
     steps:
       - name: Checkout repository
@@ -36,7 +37,7 @@ jobs:
         if: matrix.language == 'go'
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.0'
+          go-version: '1.23.x'
 
       - name: Build Go (for Go analysis)
         if: matrix.language == 'go'
