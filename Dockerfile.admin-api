@@ -1,17 +1,14 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
-
-# Copy go modules and vendor directory
-COPY go.mod go.sum ./
-COPY vendor ./vendor
 
 # Copy source code
 COPY . .
 
-# Build the admin API using vendor
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bin/admin-api ./cmd/admin-api
+# Download dependencies and build the admin API
+RUN GOPROXY=direct go mod download && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o bin/admin-api ./cmd/admin-api
 
 # Final stage - use distroless for security and minimal size
 FROM gcr.io/distroless/static:nonroot
