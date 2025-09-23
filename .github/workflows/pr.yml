@@ -257,9 +257,9 @@ jobs:
         go-version: '1.24.0'
 
     - name: Run gosec security scanner
-      uses: securego/gosec-action@v2
+      uses: securego/gosec@master
       with:
-        args: './...'
+        args: ./...
 
   # Integration test with docker-compose
   integration-test:
