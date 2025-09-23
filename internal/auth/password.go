@@ -110,7 +110,7 @@ func parseHash(encoded string) (salt, hash []byte, config PasswordConfig, err er
 		Time:    time,
 		Memory:  memory,
 		Threads: threads,
-		KeyLen:  uint32(len(hash)),  // #nosec G115 - bounds checked above
+		KeyLen:  uint32(len(hash)), // #nosec G115 - bounds checked above
 		SaltLen: uint32(len(salt)), // #nosec G115 - bounds checked above
 	}
 
