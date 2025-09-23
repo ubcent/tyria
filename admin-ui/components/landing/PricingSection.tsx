@@ -130,7 +130,7 @@ export default function PricingSection() {
             </div>
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">What happens if I exceed my plan limits?</h4>
-              <p className="text-gray-600 dark:text-gray-300 text-sm">We'll notify you before hitting limits. Overage is billed at $0.05 per 1K requests.</p>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">We&apos;ll notify you before hitting limits. Overage is billed at $0.05 per 1K requests.</p>
             </div>
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Do you offer custom enterprise plans?</h4>
