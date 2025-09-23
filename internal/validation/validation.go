@@ -172,7 +172,7 @@ func (vrw *validatingResponseWriter) Write(data []byte) (int, error) {
 	}
 
 	// Only validate JSON responses
-	contentType := vrw.Header().Get("Content-Type")
+	contentType := vrw.ResponseWriter.Header().Get("Content-Type")
 	if contentType == "application/json" || contentType == "" {
 		vrw.body.Write(data)
 	}

@@ -7,7 +7,7 @@ import (
 	"embed"
 	"fmt"
 
-	"github.com/pressly/goose/v3"
+	goose "github.com/pressly/goose/v3"
 )
 
 //go:embed *.sql

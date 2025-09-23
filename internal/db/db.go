@@ -72,5 +72,5 @@ func (db *DB) Close() error {
 
 // Health checks database connectivity
 func (db *DB) Health() error {
-	return db.Ping()
+	return db.DB.Ping()
 }

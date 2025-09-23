@@ -10,7 +10,7 @@ issues:
   exclude-rules:
     - path: _test\.go
       linters:
-        - mnd
+        - gomnd
         - lll
         - dupl
   exclude-use-default: false
@@ -82,7 +82,7 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - mnd
+    - gomnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -97,7 +97,6 @@ linters:
     - rowserrcheck
     - staticcheck
     - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -53,32 +52,44 @@ func New() *Metrics {
 
 // IncrementRequests increments the total request counter
 func (m *Metrics) IncrementRequests() {
-	atomic.AddInt64(&m.TotalRequests, 1)
+	m.mu.Lock()
+	m.TotalRequests++
+	m.mu.Unlock()
 }
 
 // IncrementProxiedRequests increments the proxied request counter
 func (m *Metrics) IncrementProxiedRequests() {
-	atomic.AddInt64(&m.ProxiedRequests, 1)
+	m.mu.Lock()
+	m.ProxiedRequests++
+	m.mu.Unlock()
 }
 
 // IncrementCachedRequests increments the cached request counter
 func (m *Metrics) IncrementCachedRequests() {
-	atomic.AddInt64(&m.CachedRequests, 1)
+	m.mu.Lock()
+	m.CachedRequests++
+	m.mu.Unlock()
 }
 
 // IncrementFailedRequests increments the failed request counter
 func (m *Metrics) IncrementFailedRequests() {
-	atomic.AddInt64(&m.FailedRequests, 1)
+	m.mu.Lock()
+	m.FailedRequests++
+	m.mu.Unlock()
 }
 
 // IncrementRateLimitedRequests increments the rate limited request counter
 func (m *Metrics) IncrementRateLimitedRequests() {
-	atomic.AddInt64(&m.RateLimitedRequests, 1)
+	m.mu.Lock()
+	m.RateLimitedRequests++
+	m.mu.Unlock()
 }
 
 // RecordResponseTime records the response time for a request
 func (m *Metrics) RecordResponseTime(duration time.Duration) {
-	atomic.AddInt64((*int64)(&m.TotalResponseTime), int64(duration))
+	m.mu.Lock()
+	m.TotalResponseTime += duration
+	m.mu.Unlock()
 }
 
 // RecordStatusCode records a status code
@@ -119,12 +130,12 @@ func (m *Metrics) GetStats() Stats {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	totalRequests := atomic.LoadInt64(&m.TotalRequests)
-	proxiedRequests := atomic.LoadInt64(&m.ProxiedRequests)
-	cachedRequests := atomic.LoadInt64(&m.CachedRequests)
-	failedRequests := atomic.LoadInt64(&m.FailedRequests)
-	rateLimitedRequests := atomic.LoadInt64(&m.RateLimitedRequests)
-	totalResponseTime := time.Duration(atomic.LoadInt64((*int64)(&m.TotalResponseTime)))
+	totalRequests := m.TotalRequests
+	proxiedRequests := m.ProxiedRequests
+	cachedRequests := m.CachedRequests
+	failedRequests := m.FailedRequests
+	rateLimitedRequests := m.RateLimitedRequests
+	totalResponseTime := m.TotalResponseTime
 
 	var avgResponseTime time.Duration
 	if totalRequests > 0 {
@@ -200,12 +211,12 @@ func (m *Metrics) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	atomic.StoreInt64(&m.TotalRequests, 0)
-	atomic.StoreInt64(&m.ProxiedRequests, 0)
-	atomic.StoreInt64(&m.CachedRequests, 0)
-	atomic.StoreInt64(&m.FailedRequests, 0)
-	atomic.StoreInt64(&m.RateLimitedRequests, 0)
-	atomic.StoreInt64((*int64)(&m.TotalResponseTime), 0)
+	m.TotalRequests = 0
+	m.ProxiedRequests = 0
+	m.CachedRequests = 0
+	m.FailedRequests = 0
+	m.RateLimitedRequests = 0
+	m.TotalResponseTime = 0
 
 	m.RouteMetrics = make(map[string]*RouteMetrics)
 	m.StatusCodes = make(map[int]int64)
