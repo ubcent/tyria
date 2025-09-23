@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -75,6 +76,22 @@ type AuthMiddleware struct {
 	jwtManager *JWTManager
 }
 
+// writeJSONError writes a JSON formatted error response
+func (m *AuthMiddleware) writeJSONError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	errorResp := struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+		Code    int    `json:"code"`
+	}{
+		Error:   http.StatusText(code),
+		Message: message,
+		Code:    code,
+	}
+	json.NewEncoder(w).Encode(errorResp)
+}
+
 // NewAuthMiddleware creates a new auth middleware
 func NewAuthMiddleware(jwtManager *JWTManager) *AuthMiddleware {
 	return &AuthMiddleware{
@@ -88,14 +105,14 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 		// Extract token from Authorization header or cookie
 		token := m.extractToken(r)
 		if token == "" {
-			http.Error(w, "Missing authentication token", http.StatusUnauthorized)
+			m.writeJSONError(w, "Missing authentication token", http.StatusUnauthorized)
 			return
 		}
 
 		// Validate token
 		claims, err := m.jwtManager.ValidateToken(token)
 		if err != nil {
-			http.Error(w, "Invalid authentication token", http.StatusUnauthorized)
+			m.writeJSONError(w, "Invalid authentication token", http.StatusUnauthorized)
 			return
 		}
 
@@ -119,12 +136,12 @@ func (m *AuthMiddleware) RequireRole(requiredRole Role) func(http.Handler) http.
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			userCtx := GetUserContext(r.Context())
 			if userCtx == nil {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				m.writeJSONError(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 
 			if !userCtx.Role.CanAccess(requiredRole) {
-				http.Error(w, "Insufficient permissions", http.StatusForbidden)
+				m.writeJSONError(w, "Insufficient permissions", http.StatusForbidden)
 				return
 			}
 
