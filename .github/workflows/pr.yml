@@ -6,6 +6,10 @@ on:
   push:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   # Go backend services testing
   go-tests:
