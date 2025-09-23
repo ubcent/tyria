@@ -3,9 +3,24 @@
 package ratelimit
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
+
+// Interface defines the rate limiter interface
+type Interface interface {
+	Allow(key string) bool
+	AllowN(key string, n int) bool
+	Stats() Stats
+	Reset()
+}
+
+// PolicyLimiter extends Interface to support policy-based rate limiting
+type PolicyLimiter interface {
+	Interface
+	AllowWithPolicy(key string, requestsPerMinute, burst int) (allowed bool, retryAfter int)
+}
 
 // TokenBucket implements a token bucket rate limiter
 type TokenBucket struct {
@@ -125,6 +140,42 @@ func (l *Limiter) Allow(key string) bool {
 func (l *Limiter) AllowN(key string, n int) bool {
 	bucket := l.getBucket(key)
 	return bucket.AllowN(n)
+}
+
+// AllowWithPolicy checks if a request is allowed with a specific policy
+func (l *Limiter) AllowWithPolicy(key string, requestsPerMinute, burst int) (allowed bool, retryAfter int) {
+	// Create a custom bucket for this specific policy
+	policyKey := fmt.Sprintf("%s:policy:%d:%d", key, requestsPerMinute, burst)
+
+	l.mu.RLock()
+	bucket, exists := l.buckets[policyKey]
+	l.mu.RUnlock()
+
+	if !exists {
+		// Create new bucket with policy-specific parameters
+		l.mu.Lock()
+		// Double-check after acquiring write lock
+		if bucket, exists = l.buckets[policyKey]; !exists {
+			refillPeriod := time.Minute
+			refillRate := requestsPerMinute
+			bucket = NewTokenBucket(burst, refillRate, refillPeriod)
+			l.buckets[policyKey] = bucket
+		}
+		l.mu.Unlock()
+	}
+
+	if bucket.Allow() {
+		return true, 0
+	}
+
+	// Calculate retry-after time
+	tokensNeeded := 1
+	retryAfterSeconds := int((float64(tokensNeeded) / float64(requestsPerMinute)) * 60)
+	if retryAfterSeconds < 1 {
+		retryAfterSeconds = 1
+	}
+
+	return false, retryAfterSeconds
 }
 
 // getBucket gets or creates a token bucket for the given key

@@ -20,6 +20,7 @@ import (
 	"github.com/ubcent/edge.link/internal/cache"
 	"github.com/ubcent/edge.link/internal/customdomains"
 	"github.com/ubcent/edge.link/internal/models"
+	"github.com/ubcent/edge.link/internal/ratelimit"
 	"github.com/ubcent/edge.link/internal/requestlogs"
 	"github.com/ubcent/edge.link/internal/routes"
 	"github.com/ubcent/edge.link/internal/tenant"
@@ -34,6 +35,17 @@ const (
 	bytesToMB           = 1024 * 1024
 )
 
+// RateLimitError represents a rate limit exceeded error
+type RateLimitError struct {
+	Message    string
+	RetryAfter int
+}
+
+// Error implements the error interface
+func (e *RateLimitError) Error() string {
+	return e.Message
+}
+
 // DBService represents a database-driven proxy service
 type DBService struct {
 	db             *sql.DB
@@ -44,12 +56,25 @@ type DBService struct {
 	logsService    *requestlogs.Service
 	cache          cache.Interface
 	keyBuilder     *cache.KeyBuilder
+	limiter        *ratelimit.Service
 }
 
 // NewDBService creates a new database-driven proxy service
 func NewDBService(db *sql.DB) *DBService {
 	// Initialize LRU cache as default
 	cacheInstance := cache.NewLRU(defaultCacheSizeMB*bytesToMB, defaultCacheTTL, defaultCacheCleanup) // 100MB cache, 5min TTL, 10min cleanup
+
+	// Initialize in-memory rate limiter as default
+	rateLimitServiceConfig := ratelimit.ServiceConfig{
+		UseRedis: false,
+		InMemoryConfig: ratelimit.Config{
+			MaxTokens:     100,
+			RefillRate:    10,
+			RefillPeriod:  time.Second,
+			CleanupPeriod: 10 * time.Minute,
+		},
+	}
+	limiterInstance := ratelimit.NewService(rateLimitServiceConfig)
 
 	return &DBService{
 		db:             db,
@@ -60,11 +85,24 @@ func NewDBService(db *sql.DB) *DBService {
 		logsService:    requestlogs.NewService(db),
 		cache:          cacheInstance,
 		keyBuilder:     cache.NewKeyBuilder(),
+		limiter:        limiterInstance,
 	}
 }
 
 // NewDBServiceWithCache creates a new database-driven proxy service with custom cache
 func NewDBServiceWithCache(db *sql.DB, cacheImpl cache.Interface) *DBService {
+	// Initialize in-memory rate limiter as default
+	rateLimitServiceConfig := ratelimit.ServiceConfig{
+		UseRedis: false,
+		InMemoryConfig: ratelimit.Config{
+			MaxTokens:     100,
+			RefillRate:    10,
+			RefillPeriod:  time.Second,
+			CleanupPeriod: 10 * time.Minute,
+		},
+	}
+	limiterInstance := ratelimit.NewService(rateLimitServiceConfig)
+
 	return &DBService{
 		db:             db,
 		routesService:  routes.NewService(db),
@@ -74,6 +112,24 @@ func NewDBServiceWithCache(db *sql.DB, cacheImpl cache.Interface) *DBService {
 		logsService:    requestlogs.NewService(db),
 		cache:          cacheImpl,
 		keyBuilder:     cache.NewKeyBuilder(),
+		limiter:        limiterInstance,
+	}
+}
+
+// NewDBServiceWithRateLimit creates a new database-driven proxy service with custom cache and rate limiting
+func NewDBServiceWithRateLimit(db *sql.DB, cacheImpl cache.Interface, rateLimitConfig ratelimit.ServiceConfig) *DBService {
+	limiterInstance := ratelimit.NewService(rateLimitConfig)
+
+	return &DBService{
+		db:             db,
+		routesService:  routes.NewService(db),
+		tenantService:  tenant.NewService(db),
+		apiKeysService: apikeys.NewService(db),
+		domainsService: customdomains.NewService(db),
+		logsService:    requestlogs.NewService(db),
+		cache:          cacheImpl,
+		keyBuilder:     cache.NewKeyBuilder(),
+		limiter:        limiterInstance,
 	}
 }
 
@@ -139,6 +195,22 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 		if err.Error() == "forbidden" {
 			status = http.StatusForbidden
 		}
+		http.Error(w, err.Error(), status)
+		s.logRequest(tenantID, &route.ID, r, start, status, 0, 0, string(cache.CacheStatusMiss))
+		return
+	}
+
+	// Enforce rate limiting
+	if err := s.enforceRateLimit(route, r, tenantID); err != nil {
+		status := http.StatusTooManyRequests
+		retryAfter := ""
+
+		// Extract retry-after from error if available
+		if rateLimitErr, ok := err.(*RateLimitError); ok {
+			retryAfter = strconv.Itoa(rateLimitErr.RetryAfter)
+		}
+
+		w.Header().Set("Retry-After", retryAfter)
 		http.Error(w, err.Error(), status)
 		s.logRequest(tenantID, &route.ID, r, start, status, 0, 0, string(cache.CacheStatusMiss))
 		return
@@ -574,6 +646,96 @@ func (s *DBService) getClientIP(r *http.Request) string {
 		ip = ip[:idx]
 	}
 	return ip
+}
+
+// enforceRateLimit enforces rate limiting for a route and tenant
+func (s *DBService) enforceRateLimit(route *models.Route, r *http.Request, tenantID int) error {
+	// Parse rate limit policy from route
+	if len(route.RateLimitPolicyJSON) == 0 {
+		return nil // No rate limiting configured
+	}
+
+	rateLimitPolicy, err := route.GetRateLimitPolicy()
+	if err != nil {
+		// Log error but don't fail the request due to policy parsing issues
+		return nil
+	}
+
+	if !rateLimitPolicy.Enabled {
+		return nil // Rate limiting disabled
+	}
+
+	// Generate rate limit key for tenant+route
+	tenantRouteKey := ratelimit.GenerateTenantRouteKey(tenantID, route.MatchPath)
+
+	// Check tenant+route rate limit
+	allowed, retryAfter := s.limiter.AllowWithPolicy(
+		tenantRouteKey,
+		rateLimitPolicy.RequestsPerMinute,
+		rateLimitPolicy.Burst,
+	)
+
+	if !allowed {
+		return &RateLimitError{
+			Message:    fmt.Sprintf("Rate limit exceeded for tenant %d on route %s", tenantID, route.MatchPath),
+			RetryAfter: retryAfter,
+		}
+	}
+
+	// Check API key specific rate limiting if an API key is present
+	apiKey := s.extractAPIKey(r)
+	if apiKey != "" {
+		// Validate the API key to check if it exists and get its info
+		keyInfo, err := s.apiKeysService.ValidateKey(context.Background(), apiKey)
+		if err == nil && keyInfo != nil && keyInfo.TenantID == tenantID {
+			// Use API key prefix for rate limiting
+			keyPrefix := keyInfo.Prefix
+			if keyPrefix == "" && len(apiKey) > 8 {
+				keyPrefix = apiKey[:8] // Use first 8 chars as fallback prefix
+			}
+
+			apiKeyRateLimitKey := ratelimit.GenerateAPIKeyKey(keyPrefix)
+
+			// Use the same policy as the route for API key rate limiting
+			// In a more advanced implementation, API keys could have their own policies
+			allowed, retryAfter := s.limiter.AllowWithPolicy(
+				apiKeyRateLimitKey,
+				rateLimitPolicy.RequestsPerMinute,
+				rateLimitPolicy.Burst,
+			)
+
+			if !allowed {
+				return &RateLimitError{
+					Message:    fmt.Sprintf("Rate limit exceeded for API key %s", keyPrefix),
+					RetryAfter: retryAfter,
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// extractAPIKey extracts API key from request headers or query parameters
+func (s *DBService) extractAPIKey(r *http.Request) string {
+	// Check Authorization header for Bearer token
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		if strings.HasPrefix(auth, "Bearer ") {
+			return strings.TrimPrefix(auth, "Bearer ")
+		}
+	}
+
+	// Check X-API-Key header
+	if apiKey := r.Header.Get("X-API-Key"); apiKey != "" {
+		return apiKey
+	}
+
+	// Check api_key query parameter
+	if apiKey := r.URL.Query().Get("api_key"); apiKey != "" {
+		return apiKey
+	}
+
+	return ""
 }
 
 // healthHandler returns health status

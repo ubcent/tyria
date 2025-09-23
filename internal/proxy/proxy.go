@@ -31,7 +31,7 @@ type Service struct {
 	config    *config.Config
 	cache     cache.Interface
 	auth      *auth.Manager
-	limiter   *ratelimit.Limiter
+	limiter   *ratelimit.Service
 	metrics   *metrics.Metrics
 	validator *validation.Validator
 }
@@ -42,13 +42,21 @@ func New(cfg *config.Config) *Service {
 	cacheInstance := cache.New(cfg.Cache.MaxSize, cfg.Cache.DefaultTTL, cfg.Cache.CleanupPeriod)
 
 	// Initialize rate limiter
-	limiterConfig := ratelimit.Config{
-		MaxTokens:     100,
-		RefillRate:    10,
-		RefillPeriod:  time.Second,
-		CleanupPeriod: 10 * time.Minute,
+	rateLimitServiceConfig := ratelimit.ServiceConfig{
+		UseRedis: cfg.Redis.Enabled,
+		RedisConfig: ratelimit.RedisConfig{
+			Addr:     cfg.Redis.Addr,
+			Password: cfg.Redis.Password,
+			DB:       cfg.Redis.DB,
+		},
+		InMemoryConfig: ratelimit.Config{
+			MaxTokens:     100,
+			RefillRate:    10,
+			RefillPeriod:  time.Second,
+			CleanupPeriod: 10 * time.Minute,
+		},
 	}
-	limiterInstance := ratelimit.NewLimiter(limiterConfig)
+	limiterInstance := ratelimit.NewService(rateLimitServiceConfig)
 
 	// Initialize auth manager
 	authManager := auth.NewManager()
