@@ -46,7 +46,7 @@ services:
     ports:
       - "3000:3000"  # Admin UI
     environment:
-      - ADMIN_API_URL=http://admin-api:3001
+      - ADMIN_API_URL=http://localhost:3001
     restart: unless-stopped
     depends_on:
       - admin-api

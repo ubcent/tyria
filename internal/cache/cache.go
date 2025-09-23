@@ -20,12 +20,12 @@ func (e *Entry) IsExpired() bool {
 
 // LRUCache provides a thread-safe in-memory cache with TTL support
 type LRUCache struct {
-	mu       sync.RWMutex
-	entries  map[string]*Entry
-	maxSize  int64
-	size     int64
+	mu         sync.RWMutex
+	entries    map[string]*Entry
+	maxSize    int64
+	size       int64
 	defaultTTL time.Duration
-	stopCh   chan struct{}
+	stopCh     chan struct{}
 }
 
 // NewLRU creates a new LRU cache instance
@@ -77,7 +77,7 @@ func (c *LRUCache) SetWithTTL(key string, value []byte, ttl time.Duration) bool 
 	defer c.mu.Unlock()
 
 	valueSize := int64(len(value))
-	
+
 	// Check if we have an existing entry
 	if existingEntry, exists := c.entries[key]; exists {
 		// Remove the size of the existing entry
@@ -88,7 +88,7 @@ func (c *LRUCache) SetWithTTL(key string, value []byte, ttl time.Duration) bool 
 	if c.size+valueSize > c.maxSize {
 		// Try to make room by removing expired entries
 		c.cleanupExpiredLocked()
-		
+
 		// Check again after cleanup
 		if c.size+valueSize > c.maxSize {
 			return false // Cannot fit
@@ -153,9 +153,9 @@ func (c *LRUCache) Stats() Stats {
 	}
 
 	return Stats{
-		Entries:      len(c.entries),
-		Size:         c.size,
-		MaxSize:      c.maxSize,
+		Entries:        len(c.entries),
+		Size:           c.size,
+		MaxSize:        c.maxSize,
 		ExpiredEntries: expired,
 	}
 }
@@ -217,13 +217,13 @@ func GenerateKey(method, path, query string) string {
 // GenerateKeyWithBody generates a cache key including request body for POST/PUT requests
 func GenerateKeyWithBody(method, path, query string, body []byte) string {
 	baseKey := GenerateKey(method, path, query)
-	
+
 	// For POST, PUT, PATCH requests with body, include MD5 hash of body
 	if (method == "POST" || method == "PUT" || method == "PATCH") && len(body) > 0 {
 		hash := md5.Sum(body)
 		return baseKey + ":body:" + fmt.Sprintf("%x", hash)
 	}
-	
+
 	return baseKey
 }
 

@@ -36,15 +36,15 @@ func (s *Service) Create(ctx context.Context, domain *models.CustomDomain) error
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at
 	`
-	
+
 	err = s.db.QueryRowContext(ctx, query,
 		domain.TenantID, domain.Hostname, domain.VerificationToken, domain.Status,
 	).Scan(&domain.ID, &domain.CreatedAt, &domain.UpdatedAt)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create custom domain: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -56,13 +56,13 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.Cust
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get custom domains for tenant: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var domains []*models.CustomDomain
 	for rows.Next() {
 		domain := &models.CustomDomain{}
@@ -75,7 +75,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.Cust
 		}
 		domains = append(domains, domain)
 	}
-	
+
 	return domains, nil
 }
 
@@ -86,20 +86,20 @@ func (s *Service) GetByHostname(ctx context.Context, hostname string) (*models.C
 		FROM custom_domains
 		WHERE hostname = $1
 	`
-	
+
 	domain := &models.CustomDomain{}
 	err := s.db.QueryRowContext(ctx, query, hostname).Scan(
 		&domain.ID, &domain.TenantID, &domain.Hostname, &domain.VerificationToken,
 		&domain.Status, &domain.CreatedAt, &domain.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("custom domain not found")
 		}
 		return nil, fmt.Errorf("failed to get custom domain: %w", err)
 	}
-	
+
 	return domain, nil
 }
 
@@ -141,20 +141,20 @@ func (s *Service) getByID(ctx context.Context, id int) (*models.CustomDomain, er
 		FROM custom_domains
 		WHERE id = $1
 	`
-	
+
 	domain := &models.CustomDomain{}
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&domain.ID, &domain.TenantID, &domain.Hostname, &domain.VerificationToken,
 		&domain.Status, &domain.CreatedAt, &domain.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("custom domain not found")
 		}
 		return nil, fmt.Errorf("failed to get custom domain: %w", err)
 	}
-	
+
 	return domain, nil
 }
 
@@ -171,30 +171,30 @@ func (s *Service) generateVerificationToken() (string, error) {
 func (s *Service) checkDNSVerification(domain, token string) (bool, error) {
 	// Look for TXT record at _edgelink.domain.com
 	verifyDomain := fmt.Sprintf("_edgelink.%s", domain)
-	
+
 	txtRecords, err := net.LookupTXT(verifyDomain)
 	if err != nil {
 		return false, fmt.Errorf("failed to lookup TXT records: %w", err)
 	}
-	
+
 	expectedValue := fmt.Sprintf("edgelink-verify=%s", token)
 	for _, record := range txtRecords {
 		if strings.Contains(record, expectedValue) {
 			return true, nil
 		}
 	}
-	
+
 	return false, nil
 }
 
 // Delete deletes a custom domain
 func (s *Service) Delete(ctx context.Context, id int, tenantID int) error {
-	_, err := s.db.ExecContext(ctx, 
-		"DELETE FROM custom_domains WHERE id = $1 AND tenant_id = $2", 
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM custom_domains WHERE id = $1 AND tenant_id = $2",
 		id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete custom domain: %w", err)
 	}
-	
+
 	return nil
 }

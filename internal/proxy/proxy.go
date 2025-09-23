@@ -156,7 +156,7 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	cacheHit := false
 	var requestBody []byte
 	var cacheKey string
-	
+
 	if route.Cache.Enabled {
 		// Read request body for POST/PUT/PATCH requests to include in cache key
 		if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
@@ -173,7 +173,7 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			cacheKey = cache.GenerateKey(r.Method, r.URL.Path, r.URL.RawQuery)
 		}
-		
+
 		// Check cache for all cacheable methods (GET is most common, but POST results can be cached too)
 		if cachedData, found := s.cache.Get(cacheKey); found {
 			w.Header().Set("X-Cache", "HIT")
@@ -197,7 +197,7 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		var result *validation.ValidationResult
 		var body []byte
 		var err error
-		
+
 		// Use already read body if available, otherwise read it
 		if requestBody != nil {
 			body = requestBody
@@ -254,18 +254,18 @@ func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *co
 
 	// Create reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	
+
 	// Customize the director to modify the request
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		
+
 		// Remove the route path prefix from the request URL
 		req.URL.Path = strings.TrimPrefix(req.URL.Path, route.Path)
 		if req.URL.Path == "" {
 			req.URL.Path = "/"
 		}
-		
+
 		// Set headers
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Set("X-Forwarded-Proto", "http")
@@ -326,12 +326,12 @@ func (crw *cachingResponseWriter) Write(data []byte) (int, error) {
 		crw.buffer.Write(data)
 	}
 	n, err := crw.ResponseWriter.Write(data)
-	
+
 	// Cache the response when done writing
 	if crw.route.Cache.Enabled && crw.statusCode >= 200 && crw.statusCode < 300 {
 		go crw.writeToCache()
 	}
-	
+
 	return n, err
 }
 
@@ -416,7 +416,7 @@ func (s *Service) cacheClearHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	s.cache.Clear()
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"message": "Cache cleared successfully"}`)

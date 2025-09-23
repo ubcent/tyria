@@ -28,7 +28,7 @@ func main() {
 	// TTL demo
 	fmt.Println("Setting key with 2-second TTL")
 	lruCache.SetWithTTL("temp:key", []byte("temporary data"), 2*time.Second)
-	
+
 	if value, found := lruCache.Get("temp:key"); found {
 		fmt.Printf("Retrieved before expiry: %s\n", string(value))
 	}
@@ -71,7 +71,7 @@ func main() {
 	// Demo 3: HTTP Caching Semantics
 	fmt.Println("\n3. HTTP Caching Semantics Demo")
 	methods := []string{"GET", "HEAD", "POST", "PUT", "DELETE", "PATCH"}
-	
+
 	for _, method := range methods {
 		cacheable := cache.IsCacheable(method)
 		fmt.Printf("Method %s: cacheable=%t\n", method, cacheable)
@@ -89,28 +89,28 @@ func main() {
 // Redis demo (commented out since it requires Redis server)
 func redisDemo() {
 	fmt.Println("\n5. Redis Cache Demo (requires Redis server)")
-	
+
 	// Uncomment to test with actual Redis server
 	/*
-	redisConfig := cache.RedisConfig{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       0,
-	}
-	
-	redisCache := cache.NewRedis(redisConfig, 5*time.Minute)
-	defer redisCache.Stop()
+		redisConfig := cache.RedisConfig{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       0,
+		}
 
-	// Test Redis operations
-	redisCache.Set("redis:test", []byte("Hello Redis"))
-	
-	if value, found := redisCache.Get("redis:test"); found {
-		fmt.Printf("Redis value: %s\n", string(value))
-	}
+		redisCache := cache.NewRedis(redisConfig, 5*time.Minute)
+		defer redisCache.Stop()
 
-	stats := redisCache.Stats()
-	fmt.Printf("Redis stats: %d entries, %d bytes\n", stats.Entries, stats.Size)
+		// Test Redis operations
+		redisCache.Set("redis:test", []byte("Hello Redis"))
+
+		if value, found := redisCache.Get("redis:test"); found {
+			fmt.Printf("Redis value: %s\n", string(value))
+		}
+
+		stats := redisCache.Stats()
+		fmt.Printf("Redis stats: %d entries, %d bytes\n", stats.Entries, stats.Size)
 	*/
-	
+
 	log.Println("Redis demo skipped (no Redis server)")
 }

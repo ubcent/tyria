@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"github.com/ubcent/edge.link/internal/cache"
 	"github.com/ubcent/edge.link/internal/models"
+	_ "modernc.org/sqlite"
 )
 
 func TestDBProxyCaching(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCacheManagement(t *testing.T) {
 	// Create test cache
 	testCache := cache.NewLRU(1024*1024, 5*time.Minute, 10*time.Minute)
 	defer testCache.Stop()
-	
+
 	service := NewDBServiceWithCache(db, testCache)
 
 	// Add some test data to cache

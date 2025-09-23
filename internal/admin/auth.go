@@ -272,7 +272,7 @@ func (a *AuthServer) SetupAuthRoutes(router *http.ServeMux) {
 	router.HandleFunc("/api/auth/signup", a.HandleSignup)
 	router.HandleFunc("/api/auth/signin", a.HandleSignin)
 	router.HandleFunc("/api/auth/signout", a.HandleSignout)
-	
+
 	// Protected routes
 	authMiddleware := auth.NewAuthMiddleware(a.jwtManager)
 	router.Handle("/api/auth/profile", authMiddleware.RequireAuth(http.HandlerFunc(a.HandleProfile)))

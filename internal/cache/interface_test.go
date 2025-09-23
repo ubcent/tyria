@@ -112,7 +112,7 @@ func TestKeyBuilder_GenerateKeyWithBody(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			result := kb.GenerateKeyWithBody(test.tenantID, test.route, test.method, test.path, test.query, test.body, test.varyHeaders)
-			
+
 			// Check if the result contains tenant, route, and method/path
 			expectedBase := "tenant:1:route:api-route:"
 			if !strings.HasPrefix(result, expectedBase) {

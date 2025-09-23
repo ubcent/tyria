@@ -27,7 +27,7 @@ const (
 
 func main() {
 	var (
-		configPath = flag.String("config", defaultConfigPath, "Path to configuration file")
+		configPath  = flag.String("config", defaultConfigPath, "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version and exit")
 	)
 	flag.Parse()
@@ -97,7 +97,7 @@ func main() {
 	// Create proxy service and mount its handler
 	var proxyService *proxy.Service
 	var dbProxyService *proxy.DBService
-	
+
 	if database != nil {
 		// Use database-driven proxy when database is available
 		dbProxyService = proxy.NewDBService(database.DB)
@@ -137,7 +137,7 @@ func main() {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		})
-		
+
 		metricsServer = &http.Server{
 			Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),
 			Handler: metricsRouter,

@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	_ "modernc.org/sqlite"
 	"github.com/ubcent/edge.link/internal/cache"
+	_ "modernc.org/sqlite"
 )
 
 func TestSimpleDBProxy(t *testing.T) {
@@ -21,7 +21,7 @@ func TestSimpleDBProxy(t *testing.T) {
 	// Create minimal test cache
 	testCache := cache.NewLRU(1024*1024, 5*60, 10*60)
 	defer testCache.Stop()
-	
+
 	service := NewDBServiceWithCache(db, testCache)
 
 	t.Run("health check", func(t *testing.T) {
@@ -36,7 +36,7 @@ func TestSimpleDBProxy(t *testing.T) {
 
 		t.Logf("Health response: %s", w.Body.String())
 	})
-	
+
 	t.Run("cache stats", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/cache/stats", nil)
 		w := httptest.NewRecorder()

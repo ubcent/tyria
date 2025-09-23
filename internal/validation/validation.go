@@ -140,10 +140,10 @@ func (v *Validator) Middleware(requestSchema, responseSchema string) func(http.H
 			// If response validation is needed, wrap the response writer
 			if responseSchema != "" {
 				wrapped := &validatingResponseWriter{
-					ResponseWriter:   w,
-					validator:        v,
-					responseSchema:   responseSchema,
-					statusCode:       200,
+					ResponseWriter: w,
+					validator:      v,
+					responseSchema: responseSchema,
+					statusCode:     200,
 				}
 				next.ServeHTTP(wrapped, r)
 				return

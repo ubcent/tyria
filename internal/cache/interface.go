@@ -41,7 +41,7 @@ func NewKeyBuilder() *KeyBuilder {
 func (kb *KeyBuilder) GenerateKey(tenantID int, route string, method, path, query string, varyHeaders map[string]string) string {
 	baseKey := GenerateKey(method, path, query)
 	key := fmt.Sprintf("tenant:%d:route:%s:%s", tenantID, route, baseKey)
-	
+
 	// Add vary headers to key if present
 	if len(varyHeaders) > 0 {
 		var headerParts []string
@@ -52,7 +52,7 @@ func (kb *KeyBuilder) GenerateKey(tenantID int, route string, method, path, quer
 		sort.Strings(headerParts)
 		key += ":vary:" + strings.Join(headerParts, "&")
 	}
-	
+
 	return key
 }
 
@@ -60,7 +60,7 @@ func (kb *KeyBuilder) GenerateKey(tenantID int, route string, method, path, quer
 func (kb *KeyBuilder) GenerateKeyWithBody(tenantID int, route string, method, path, query string, body []byte, varyHeaders map[string]string) string {
 	baseKey := GenerateKeyWithBody(method, path, query, body)
 	key := fmt.Sprintf("tenant:%d:route:%s:%s", tenantID, route, baseKey)
-	
+
 	// Add vary headers to key if present
 	if len(varyHeaders) > 0 {
 		var headerParts []string
@@ -71,7 +71,7 @@ func (kb *KeyBuilder) GenerateKeyWithBody(tenantID int, route string, method, pa
 		sort.Strings(headerParts)
 		key += ":vary:" + strings.Join(headerParts, "&")
 	}
-	
+
 	return key
 }
 

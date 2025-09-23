@@ -13,23 +13,23 @@ import (
 
 // Domain represents a domain configuration for a tenant
 type Domain struct {
-	ID           int       `json:"id" db:"id"`
-	TenantID     int       `json:"tenant_id" db:"tenant_id"`
-	Domain       string    `json:"domain" db:"domain"`
-	ProxyURL     string    `json:"proxy_url" db:"proxy_url"`
-	Verified     bool      `json:"verified" db:"verified"`
-	VerifyToken  string    `json:"verify_token" db:"verify_token"`
-	SSLEnabled   bool      `json:"ssl_enabled" db:"ssl_enabled"`
-	SSLCertPath  string    `json:"ssl_cert_path" db:"ssl_cert_path"`
-	SSLKeyPath   string    `json:"ssl_key_path" db:"ssl_key_path"`
-	Enabled      bool      `json:"enabled" db:"enabled"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+	ID          int       `json:"id" db:"id"`
+	TenantID    int       `json:"tenant_id" db:"tenant_id"`
+	Domain      string    `json:"domain" db:"domain"`
+	ProxyURL    string    `json:"proxy_url" db:"proxy_url"`
+	Verified    bool      `json:"verified" db:"verified"`
+	VerifyToken string    `json:"verify_token" db:"verify_token"`
+	SSLEnabled  bool      `json:"ssl_enabled" db:"ssl_enabled"`
+	SSLCertPath string    `json:"ssl_cert_path" db:"ssl_cert_path"`
+	SSLKeyPath  string    `json:"ssl_key_path" db:"ssl_key_path"`
+	Enabled     bool      `json:"enabled" db:"enabled"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // Service provides domain management functionality
 type Service struct {
-	db      *sql.DB
+	db         *sql.DB
 	baseDomain string
 }
 
@@ -58,16 +58,16 @@ func (s *Service) Create(ctx context.Context, domain *Domain) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at
 	`
-	
+
 	err = s.db.QueryRowContext(ctx, query,
 		domain.TenantID, domain.Domain, domain.ProxyURL, domain.VerifyToken,
 		domain.Verified, domain.SSLEnabled, domain.Enabled,
 	).Scan(&domain.ID, &domain.CreatedAt, &domain.UpdatedAt)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create domain: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -80,13 +80,13 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*Domain, err
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get domains for tenant: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var domains []*Domain
 	for rows.Next() {
 		domain := &Domain{}
@@ -101,7 +101,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*Domain, err
 		}
 		domains = append(domains, domain)
 	}
-	
+
 	return domains, nil
 }
 
@@ -139,7 +139,7 @@ func (s *Service) getByID(ctx context.Context, id int) (*Domain, error) {
 		FROM domains
 		WHERE id = $1
 	`
-	
+
 	domain := &Domain{}
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&domain.ID, &domain.TenantID, &domain.Domain, &domain.ProxyURL,
@@ -147,14 +147,14 @@ func (s *Service) getByID(ctx context.Context, id int) (*Domain, error) {
 		&domain.SSLCertPath, &domain.SSLKeyPath, &domain.Enabled,
 		&domain.CreatedAt, &domain.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("domain not found")
 		}
 		return nil, fmt.Errorf("failed to get domain: %w", err)
 	}
-	
+
 	return domain, nil
 }
 
@@ -170,7 +170,7 @@ func (s *Service) generateProxyURL(domain string) string {
 func generateVerificationToken() (string, error) {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	const length = 32
-	
+
 	result := make([]byte, length)
 	for i := range result {
 		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
@@ -179,7 +179,7 @@ func generateVerificationToken() (string, error) {
 		}
 		result[i] = charset[num.Int64()]
 	}
-	
+
 	return string(result), nil
 }
 
@@ -187,18 +187,18 @@ func generateVerificationToken() (string, error) {
 func (s *Service) checkDNSVerification(domain, token string) (bool, error) {
 	// Look for TXT record at _edgelink.domain.com
 	verifyDomain := fmt.Sprintf("_edgelink.%s", domain)
-	
+
 	txtRecords, err := net.LookupTXT(verifyDomain)
 	if err != nil {
 		return false, fmt.Errorf("failed to lookup TXT records: %w", err)
 	}
-	
+
 	expectedValue := fmt.Sprintf("edgelink-verify=%s", token)
 	for _, record := range txtRecords {
 		if record == expectedValue {
 			return true, nil
 		}
 	}
-	
+
 	return false, nil
 }

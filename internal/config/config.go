@@ -12,13 +12,13 @@ import (
 
 // Config represents the main configuration for the proxy service
 type Config struct {
-	Server       ServerConfig     `yaml:"server" json:"server"`
-	Database     DatabaseConfig   `yaml:"database" json:"database"`
-	Cache        CacheConfig      `yaml:"cache" json:"cache"`
-	Routes       []RouteConfig    `yaml:"routes" json:"routes"`
-	APIKeys      []APIKeyConfig   `yaml:"api_keys" json:"api_keys"`
-	Logging      LoggingConfig    `yaml:"logging" json:"logging"`
-	Metrics      MetricsConfig    `yaml:"metrics" json:"metrics"`
+	Server       ServerConfig       `yaml:"server" json:"server"`
+	Database     DatabaseConfig     `yaml:"database" json:"database"`
+	Cache        CacheConfig        `yaml:"cache" json:"cache"`
+	Routes       []RouteConfig      `yaml:"routes" json:"routes"`
+	APIKeys      []APIKeyConfig     `yaml:"api_keys" json:"api_keys"`
+	Logging      LoggingConfig      `yaml:"logging" json:"logging"`
+	Metrics      MetricsConfig      `yaml:"metrics" json:"metrics"`
 	FeatureFlags FeatureFlagsConfig `yaml:"feature_flags" json:"feature_flags"`
 }
 
@@ -40,13 +40,13 @@ type CacheConfig struct {
 
 // RouteConfig defines a proxy route configuration
 type RouteConfig struct {
-	Path         string               `yaml:"path" json:"path"`
-	Target       string               `yaml:"target" json:"target"`
-	Methods      []string             `yaml:"methods" json:"methods"`
-	Cache        RouteCacheConfig     `yaml:"cache" json:"cache"`
-	RateLimit    RouteRateLimitConfig `yaml:"rate_limit" json:"rate_limit"`
-	Auth         RouteAuthConfig      `yaml:"auth" json:"auth"`
-	Validation   RouteValidationConfig `yaml:"validation" json:"validation"`
+	Path       string                `yaml:"path" json:"path"`
+	Target     string                `yaml:"target" json:"target"`
+	Methods    []string              `yaml:"methods" json:"methods"`
+	Cache      RouteCacheConfig      `yaml:"cache" json:"cache"`
+	RateLimit  RouteRateLimitConfig  `yaml:"rate_limit" json:"rate_limit"`
+	Auth       RouteAuthConfig       `yaml:"auth" json:"auth"`
+	Validation RouteValidationConfig `yaml:"validation" json:"validation"`
 }
 
 // RouteCacheConfig holds route-specific cache configuration
@@ -72,8 +72,8 @@ type RouteAuthConfig struct {
 
 // RouteValidationConfig holds route-specific validation configuration
 type RouteValidationConfig struct {
-	Enabled      bool   `yaml:"enabled" json:"enabled"`
-	RequestSchema string `yaml:"request_schema" json:"request_schema"`
+	Enabled        bool   `yaml:"enabled" json:"enabled"`
+	RequestSchema  string `yaml:"request_schema" json:"request_schema"`
 	ResponseSchema string `yaml:"response_schema" json:"response_schema"`
 }
 
@@ -115,12 +115,12 @@ type DatabaseConfig struct {
 
 // FeatureFlagsConfig holds feature flag configuration
 type FeatureFlagsConfig struct {
-	MultiTenant      bool `yaml:"multi_tenant" json:"multi_tenant"`
-	DomainLinking    bool `yaml:"domain_linking" json:"domain_linking"`
-	UserAuth         bool `yaml:"user_auth" json:"user_auth"`
-	BillingEnabled   bool `yaml:"billing_enabled" json:"billing_enabled"`
+	MultiTenant       bool `yaml:"multi_tenant" json:"multi_tenant"`
+	DomainLinking     bool `yaml:"domain_linking" json:"domain_linking"`
+	UserAuth          bool `yaml:"user_auth" json:"user_auth"`
+	BillingEnabled    bool `yaml:"billing_enabled" json:"billing_enabled"`
 	EmailVerification bool `yaml:"email_verification" json:"email_verification"`
-	SSLProvisioning  bool `yaml:"ssl_provisioning" json:"ssl_provisioning"`
+	SSLProvisioning   bool `yaml:"ssl_provisioning" json:"ssl_provisioning"`
 }
 
 // LoadConfig loads configuration from a file
@@ -131,7 +131,7 @@ func LoadConfig(path string) (*Config, error) {
 	}
 
 	var config Config
-	
+
 	// Try YAML first, then JSON
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		if err := json.Unmarshal(data, &config); err != nil {
@@ -141,7 +141,7 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Set defaults
 	config.setDefaults()
-	
+
 	return &config, nil
 }
 

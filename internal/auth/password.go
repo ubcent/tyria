@@ -11,11 +11,11 @@ import (
 
 const (
 	// Argon2 parameters
-	saltLen    = 32
-	keyLen     = 32
-	timeParam  = 1
-	memory     = 64 * 1024 // 64 MB
-	threads    = 4
+	saltLen   = 32
+	keyLen    = 32
+	timeParam = 1
+	memory    = 64 * 1024 // 64 MB
+	threads   = 4
 )
 
 // PasswordConfig holds the argon2id configuration
@@ -41,7 +41,7 @@ func DefaultPasswordConfig() PasswordConfig {
 // HashPassword hashes a password using argon2id
 func HashPassword(password string) (string, error) {
 	config := DefaultPasswordConfig()
-	
+
 	salt := make([]byte, config.SaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("failed to generate salt: %w", err)

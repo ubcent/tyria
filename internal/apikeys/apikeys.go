@@ -49,15 +49,15 @@ func (s *Service) Create(ctx context.Context, apiKey *models.APIKey) (string, er
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at
 	`
-	
+
 	err = s.db.QueryRowContext(ctx, query,
 		apiKey.TenantID, apiKey.Name, apiKey.Prefix, apiKey.Hash,
 	).Scan(&apiKey.ID, &apiKey.CreatedAt, &apiKey.UpdatedAt)
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to create API key: %w", err)
 	}
-	
+
 	return fullKey, nil
 }
 
@@ -69,13 +69,13 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.APIK
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API keys for tenant: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var keys []*models.APIKey
 	for rows.Next() {
 		key := &models.APIKey{}
@@ -88,7 +88,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.APIK
 		}
 		keys = append(keys, key)
 	}
-	
+
 	return keys, nil
 }
 
@@ -106,13 +106,13 @@ func (s *Service) ValidateKey(ctx context.Context, keyValue string) (*models.API
 		FROM api_keys
 		WHERE prefix = $1
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query API keys: %w", err)
 	}
 	defer rows.Close()
-	
+
 	// Check each key with matching prefix
 	for rows.Next() {
 		key := &models.APIKey{}
@@ -123,7 +123,7 @@ func (s *Service) ValidateKey(ctx context.Context, keyValue string) (*models.API
 		if err != nil {
 			continue
 		}
-		
+
 		// Validate the full key against hash
 		if bcrypt.CompareHashAndPassword([]byte(key.Hash), []byte(keyValue)) == nil {
 			// Update last used timestamp
@@ -131,19 +131,19 @@ func (s *Service) ValidateKey(ctx context.Context, keyValue string) (*models.API
 			return key, nil
 		}
 	}
-	
+
 	return nil, fmt.Errorf("invalid API key")
 }
 
 // Delete deletes an API key
 func (s *Service) Delete(ctx context.Context, id int, tenantID int) error {
-	_, err := s.db.ExecContext(ctx, 
-		"DELETE FROM api_keys WHERE id = $1 AND tenant_id = $2", 
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM api_keys WHERE id = $1 AND tenant_id = $2",
 		id, tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to delete API key: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -154,28 +154,28 @@ func (s *Service) generateAPIKey() (string, error) {
 	if _, err := rand.Read(keyBytes); err != nil {
 		return "", err
 	}
-	
+
 	// Generate random bytes for the prefix (shorter, for fast lookup)
 	prefixBytes := make([]byte, 8)
 	if _, err := rand.Read(prefixBytes); err != nil {
 		return "", err
 	}
-	
+
 	// Encode both parts
 	prefix := base64.URLEncoding.EncodeToString(prefixBytes)
 	key := base64.URLEncoding.EncodeToString(keyBytes)
-	
+
 	// Remove padding and make URL-safe
 	prefix = strings.TrimRight(prefix, "=")
 	key = strings.TrimRight(key, "=")
-	
+
 	// Return in prefix.key format as specified
 	return fmt.Sprintf("el_%s.%s", prefix, key), nil
 }
 
 // updateLastUsed updates the last used timestamp for an API key
 func (s *Service) updateLastUsed(ctx context.Context, id int) {
-	_, err := s.db.ExecContext(ctx, 
+	_, err := s.db.ExecContext(ctx,
 		"UPDATE api_keys SET last_used_at = NOW() WHERE id = $1", id)
 	if err != nil {
 		// Log error but don't fail the request

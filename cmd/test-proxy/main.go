@@ -9,21 +9,21 @@ import (
 	"net/http"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/ubcent/edge.link/internal/apikeys"
 	"github.com/ubcent/edge.link/internal/models"
 	"github.com/ubcent/edge.link/internal/proxy"
 	"github.com/ubcent/edge.link/internal/routes"
 	"github.com/ubcent/edge.link/internal/tenant"
-	"github.com/ubcent/edge.link/internal/apikeys"
+	_ "modernc.org/sqlite"
 )
 
 func main() {
 	// Start mock upstream server
 	go startMockUpstream()
-	
+
 	// Give the mock server time to start
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Create in-memory SQLite database for testing
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
@@ -105,7 +105,7 @@ func main() {
 	log.Println("1. curl -H 'X-Tenant: 1' http://localhost:8080/users/123")
 	log.Println("2. curl http://localhost:8080/1/api/posts")
 	log.Println("3. curl -H 'X-API-Key: [generated key]' -H 'X-Tenant: 1' http://localhost:8080/admin/users")
-	
+
 	if err := http.ListenAndServe(":8080", proxyService.Handler()); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
@@ -163,7 +163,7 @@ func setupTestData(db *sql.DB) {
 		route.HeadersJSON = json.RawMessage(`{}`)
 		route.CachingPolicyJSON = json.RawMessage(`{"enabled": false, "ttl_seconds": 300}`)
 		route.RateLimitPolicyJSON = json.RawMessage(`{"enabled": false, "requests_per_minute": 60}`)
-		
+
 		if err := routesService.Create(ctx, route); err != nil {
 			log.Fatalf("Failed to create route %s: %v", route.Name, err)
 		}
@@ -180,7 +180,7 @@ func setupTestData(db *sql.DB) {
 		log.Fatalf("Failed to create API key: %v", err)
 	}
 	log.Printf("Created API key: %s", fullKey)
-	
+
 	// Print the key for manual testing
 	fmt.Printf("\nFor testing protected routes, use this API key:\n")
 	fmt.Printf("curl -H 'X-API-Key: %s' -H 'X-Tenant: 1' http://localhost:8080/admin/users\n\n", fullKey)
@@ -188,18 +188,18 @@ func setupTestData(db *sql.DB) {
 
 func startMockUpstream() {
 	mux := http.NewServeMux()
-	
+
 	mux.HandleFunc("/users/", func(w http.ResponseWriter, r *http.Request) {
 		userID := r.URL.Path[len("/users/"):]
 		response := map[string]interface{}{
-			"id":   userID,
-			"name": "Test User " + userID,
+			"id":    userID,
+			"name":  "Test User " + userID,
 			"email": "test" + userID + "@example.com",
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
-	
+
 	mux.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
 		response := []map[string]interface{}{
 			{"id": 1, "title": "Test Post 1", "body": "This is a test post"},
@@ -208,17 +208,17 @@ func startMockUpstream() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
-	
+
 	mux.HandleFunc("/admin/", func(w http.ResponseWriter, r *http.Request) {
 		response := map[string]interface{}{
 			"message": "Admin API accessed successfully",
-			"path": r.URL.Path,
-			"method": r.Method,
+			"path":    r.URL.Path,
+			"method":  r.Method,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
-	
+
 	log.Println("Starting mock upstream server on :9999")
 	http.ListenAndServe(":9999", mux)
 }

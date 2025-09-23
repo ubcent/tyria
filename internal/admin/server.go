@@ -15,7 +15,7 @@ import (
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
-	
+
 	"github.com/ubcent/edge.link/internal/apikeys"
 	"github.com/ubcent/edge.link/internal/models"
 	"github.com/ubcent/edge.link/internal/routes"
@@ -30,10 +30,10 @@ type ErrorResponse struct {
 
 // Server represents the admin API server
 type Server struct {
-	db            *sql.DB
-	router        *mux.Router
+	db             *sql.DB
+	router         *mux.Router
 	apiKeysService *apikeys.Service
-	routesService *routes.Service
+	routesService  *routes.Service
 }
 
 // writeJSONError writes a JSON formatted error response
@@ -50,38 +50,38 @@ func (s *Server) writeJSONError(w http.ResponseWriter, message string, code int)
 
 // ProxyRoute represents a proxy route configuration
 type ProxyRoute struct {
-	ID                     int       `json:"id"`
-	Path                   string    `json:"path"`
-	Target                 string    `json:"target"`
-	Methods                []string  `json:"methods"`
-	CacheEnabled           bool      `json:"cache_enabled"`
-	CacheTTL               int       `json:"cache_ttl"`
-	RateLimitEnabled       bool      `json:"rate_limit_enabled"`
-	RateLimitRate          int       `json:"rate_limit_rate"`
-	RateLimitBurst         int       `json:"rate_limit_burst"`
-	RateLimitPeriod        int       `json:"rate_limit_period"`
-	RateLimitPerClient     bool      `json:"rate_limit_per_client"`
-	AuthRequired           bool      `json:"auth_required"`
-	AuthKeys               []string  `json:"auth_keys"`
-	ValidationEnabled      bool      `json:"validation_enabled"`
-	ValidationRequestSchema *string  `json:"validation_request_schema"`
-	ValidationResponseSchema *string `json:"validation_response_schema"`
-	Enabled                bool      `json:"enabled"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                       int       `json:"id"`
+	Path                     string    `json:"path"`
+	Target                   string    `json:"target"`
+	Methods                  []string  `json:"methods"`
+	CacheEnabled             bool      `json:"cache_enabled"`
+	CacheTTL                 int       `json:"cache_ttl"`
+	RateLimitEnabled         bool      `json:"rate_limit_enabled"`
+	RateLimitRate            int       `json:"rate_limit_rate"`
+	RateLimitBurst           int       `json:"rate_limit_burst"`
+	RateLimitPeriod          int       `json:"rate_limit_period"`
+	RateLimitPerClient       bool      `json:"rate_limit_per_client"`
+	AuthRequired             bool      `json:"auth_required"`
+	AuthKeys                 []string  `json:"auth_keys"`
+	ValidationEnabled        bool      `json:"validation_enabled"`
+	ValidationRequestSchema  *string   `json:"validation_request_schema"`
+	ValidationResponseSchema *string   `json:"validation_response_schema"`
+	Enabled                  bool      `json:"enabled"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
 }
 
 // APIKey represents an API key configuration
 type APIKey struct {
-	ID          int       `json:"id"`
-	KeyValue    string    `json:"key_value"`
-	Name        string    `json:"name"`
-	Permissions []string  `json:"permissions"`
-	RateLimit   int       `json:"rate_limit"`
-	Enabled     bool      `json:"enabled"`
+	ID          int        `json:"id"`
+	KeyValue    string     `json:"key_value"`
+	Name        string     `json:"name"`
+	Permissions []string   `json:"permissions"`
+	RateLimit   int        `json:"rate_limit"`
+	Enabled     bool       `json:"enabled"`
 	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // CreateAPIKeyRequest represents the request to create an API key
@@ -100,12 +100,12 @@ type CreateAPIKeyResponse struct {
 
 // DashboardStats represents dashboard statistics
 type DashboardStats struct {
-	TotalRequests       int64   `json:"total_requests"`
-	AvgResponseTime     float64 `json:"avg_response_time"`
-	SuccessRate         float64 `json:"success_rate"`
-	CacheHitRate        float64 `json:"cache_hit_rate"`
-	ActiveRoutes        int     `json:"active_routes"`
-	ActiveAPIKeys       int     `json:"active_api_keys"`
+	TotalRequests   int64   `json:"total_requests"`
+	AvgResponseTime float64 `json:"avg_response_time"`
+	SuccessRate     float64 `json:"success_rate"`
+	CacheHitRate    float64 `json:"cache_hit_rate"`
+	ActiveRoutes    int     `json:"active_routes"`
+	ActiveAPIKeys   int     `json:"active_api_keys"`
 }
 
 // NewServer creates a new admin API server
@@ -150,7 +150,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/auth/signin", authServer.HandleSignin).Methods("POST", "OPTIONS")
 	api.HandleFunc("/auth/signout", authServer.HandleSignout).Methods("POST", "OPTIONS")
 	api.HandleFunc("/auth/confirm-email", authServer.HandleConfirmEmail).Methods("POST", "OPTIONS")
-	
+
 	// Protected auth routes
 	authMiddleware := authServer.GetAuthMiddleware()
 	protectedAuth := api.PathPrefix("/auth").Subrouter()
@@ -165,11 +165,11 @@ func (s *Server) setupRoutes() {
 	v1 := api.PathPrefix("/v1").Subrouter()
 	v1.HandleFunc("/api-keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	v1.HandleFunc("/api-keys/{id}", s.handleAPIKey).Methods("DELETE", "OPTIONS")
-	
+
 	// Routes management - v1 endpoints with validation
 	v1.HandleFunc("/routes", s.handleV1Routes).Methods("GET", "POST", "OPTIONS")
 	v1.HandleFunc("/routes/{id}", s.handleV1Route).Methods("GET", "PUT", "DELETE", "OPTIONS")
-	
+
 	// Legacy API Keys management (for backward compatibility)
 	api.HandleFunc("/keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	api.HandleFunc("/keys/{id}", s.handleAPIKey).Methods("GET", "PUT", "DELETE", "OPTIONS")
@@ -449,7 +449,7 @@ func (s *Server) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 // getAPIKeys retrieves all API keys for the tenant
 func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	keys, err := s.apiKeysService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting API keys for tenant %d: %v", tenantID, err)
@@ -476,7 +476,7 @@ func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 // createAPIKey creates a new API key
 func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	var req CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
@@ -556,7 +556,7 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 // deleteAPIKey deletes an API key
 func (s *Server) deleteAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	err := s.apiKeysService.Delete(r.Context(), id, tenantID)
 	if err != nil {
 		log.Printf("Error deleting API key %d for tenant %d: %v", id, tenantID, err)
@@ -677,24 +677,24 @@ func validateURL(urlStr string) error {
 	if urlStr == "" {
 		return fmt.Errorf("URL cannot be empty")
 	}
-	
+
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("invalid URL format: %w", err)
 	}
-	
+
 	if parsedURL.Scheme == "" {
 		return fmt.Errorf("URL must include a scheme (http:// or https://)")
 	}
-	
+
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return fmt.Errorf("URL scheme must be http or https")
 	}
-	
+
 	if parsedURL.Host == "" {
 		return fmt.Errorf("URL must include a host")
 	}
-	
+
 	return nil
 }
 
@@ -714,7 +714,7 @@ func validateJSON(jsonStr string) error {
 	if jsonStr == "" {
 		return nil // Empty JSON is allowed
 	}
-	
+
 	var temp interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &temp); err != nil {
 		return fmt.Errorf("invalid JSON format: %w", err)
@@ -727,38 +727,38 @@ func (s *Server) validateRouteInput(route *models.Route) error {
 	if route.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	
+
 	if route.MatchPath == "" {
 		return fmt.Errorf("match_path is required")
 	}
-	
+
 	if err := validateURL(route.UpstreamURL); err != nil {
 		return fmt.Errorf("upstream_url validation failed: %w", err)
 	}
-	
+
 	if err := validateAuthMode(route.AuthMode); err != nil {
 		return err
 	}
-	
+
 	// Validate JSON fields
 	if len(route.HeadersJSON) > 0 {
 		if err := validateJSON(string(route.HeadersJSON)); err != nil {
 			return fmt.Errorf("headers_json validation failed: %w", err)
 		}
 	}
-	
+
 	if len(route.CachingPolicyJSON) > 0 {
 		if err := validateJSON(string(route.CachingPolicyJSON)); err != nil {
 			return fmt.Errorf("caching_policy_json validation failed: %w", err)
 		}
 	}
-	
+
 	if len(route.RateLimitPolicyJSON) > 0 {
 		if err := validateJSON(string(route.RateLimitPolicyJSON)); err != nil {
 			return fmt.Errorf("rate_limit_policy_json validation failed: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -794,7 +794,7 @@ func (s *Server) handleV1Route(w http.ResponseWriter, r *http.Request) {
 // getV1Routes retrieves all routes using the new v1 format
 func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	routes, err := s.routesService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting routes for tenant %d: %v", tenantID, err)
@@ -809,7 +809,7 @@ func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
 // createV1Route creates a new route with validation
 func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	var route models.Route
 	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
 		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
@@ -840,7 +840,7 @@ func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 // updateV1Route updates an existing route with validation
 func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	// First, get the existing route to ensure it belongs to the tenant
 	existingRoute, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
@@ -888,7 +888,7 @@ func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 // deleteV1Route deletes a route
 func (s *Server) deleteV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	// Verify the route belongs to the tenant before deleting
 	existingRoute, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
@@ -918,7 +918,7 @@ func (s *Server) deleteV1Route(w http.ResponseWriter, r *http.Request, id int) {
 // getV1Route retrieves a single route
 func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	route, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
 		if err == sql.ErrNoRows {

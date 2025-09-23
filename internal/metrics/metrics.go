@@ -11,35 +11,35 @@ import (
 // Metrics collects and tracks various proxy metrics
 type Metrics struct {
 	mu sync.RWMutex
-	
+
 	// Request metrics
-	TotalRequests    int64 `json:"total_requests"`
-	ProxiedRequests  int64 `json:"proxied_requests"`
-	CachedRequests   int64 `json:"cached_requests"`
-	FailedRequests   int64 `json:"failed_requests"`
+	TotalRequests       int64 `json:"total_requests"`
+	ProxiedRequests     int64 `json:"proxied_requests"`
+	CachedRequests      int64 `json:"cached_requests"`
+	FailedRequests      int64 `json:"failed_requests"`
 	RateLimitedRequests int64 `json:"rate_limited_requests"`
-	
+
 	// Response metrics
 	TotalResponseTime time.Duration `json:"total_response_time_ns"`
-	
+
 	// Route metrics
 	RouteMetrics map[string]*RouteMetrics `json:"route_metrics"`
-	
+
 	// Status code metrics
 	StatusCodes map[int]int64 `json:"status_codes"`
-	
+
 	// Start time
 	StartTime time.Time `json:"start_time"`
 }
 
 // RouteMetrics tracks metrics for a specific route
 type RouteMetrics struct {
-	Requests      int64         `json:"requests"`
-	CacheHits     int64         `json:"cache_hits"`
-	CacheMisses   int64         `json:"cache_misses"`
-	Errors        int64         `json:"errors"`
-	ResponseTime  time.Duration `json:"response_time_ns"`
-	LastAccessed  time.Time     `json:"last_accessed"`
+	Requests     int64         `json:"requests"`
+	CacheHits    int64         `json:"cache_hits"`
+	CacheMisses  int64         `json:"cache_misses"`
+	Errors       int64         `json:"errors"`
+	ResponseTime time.Duration `json:"response_time_ns"`
+	LastAccessed time.Time     `json:"last_accessed"`
 }
 
 // New creates a new metrics instance
@@ -140,12 +140,12 @@ func (m *Metrics) GetStats() Stats {
 		}
 
 		routeMetrics[route] = RouteStats{
-			Requests:           metrics.Requests,
-			CacheHits:          metrics.CacheHits,
-			CacheMisses:        metrics.CacheMisses,
-			Errors:             metrics.Errors,
-			AvgResponseTime:    avgRouteResponseTime,
-			LastAccessed:       metrics.LastAccessed,
+			Requests:        metrics.Requests,
+			CacheHits:       metrics.CacheHits,
+			CacheMisses:     metrics.CacheMisses,
+			Errors:          metrics.Errors,
+			AvgResponseTime: avgRouteResponseTime,
+			LastAccessed:    metrics.LastAccessed,
 		}
 	}
 
@@ -216,7 +216,7 @@ func (m *Metrics) Reset() {
 func (m *Metrics) Handler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		stats := m.GetStats()
 		if err := json.NewEncoder(w).Encode(stats); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -229,21 +229,21 @@ func (m *Metrics) Handler() http.HandlerFunc {
 func (m *Metrics) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
+
 		// Increment total requests
 		m.IncrementRequests()
-		
+
 		// Wrap response writer to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: 200}
-		
+
 		// Call next handler
 		next.ServeHTTP(wrapped, r)
-		
+
 		// Record metrics
 		duration := time.Since(start)
 		m.RecordResponseTime(duration)
 		m.RecordStatusCode(wrapped.statusCode)
-		
+
 		// Record error if status code indicates failure
 		if wrapped.statusCode >= 400 {
 			m.IncrementFailedRequests()

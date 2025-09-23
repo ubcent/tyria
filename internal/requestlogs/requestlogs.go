@@ -28,16 +28,16 @@ func (s *Service) Log(ctx context.Context, log *models.RequestLog) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
-	
+
 	err := s.db.QueryRowContext(ctx, query,
 		log.TenantID, log.RouteID, log.StatusCode, log.LatencyMs,
 		log.CacheStatus, log.BytesIn, log.BytesOut, log.CreatedAt,
 	).Scan(&log.ID)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create request log: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -50,13 +50,13 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int, limit, offset i
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, tenantID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get request logs for tenant: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var logs []*models.RequestLog
 	for rows.Next() {
 		log := &models.RequestLog{}
@@ -69,7 +69,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int, limit, offset i
 		}
 		logs = append(logs, log)
 	}
-	
+
 	return logs, nil
 }
 
@@ -82,13 +82,13 @@ func (s *Service) GetByRoute(ctx context.Context, routeID int, limit, offset int
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, routeID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get request logs for route: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var logs []*models.RequestLog
 	for rows.Next() {
 		log := &models.RequestLog{}
@@ -101,7 +101,7 @@ func (s *Service) GetByRoute(ctx context.Context, routeID int, limit, offset int
 		}
 		logs = append(logs, log)
 	}
-	
+
 	return logs, nil
 }
 
@@ -118,57 +118,57 @@ func (s *Service) GetStats(ctx context.Context, tenantID int, since time.Time) (
 		FROM requests_log
 		WHERE tenant_id = $1 AND created_at >= $2
 	`
-	
+
 	var stats RequestStats
 	var avgLatency sql.NullFloat64
 	var totalBytesIn, totalBytesOut sql.NullInt64
-	
+
 	err := s.db.QueryRowContext(ctx, query, tenantID, since).Scan(
 		&stats.TotalRequests, &avgLatency, &stats.SuccessCount,
 		&stats.CacheHits, &totalBytesIn, &totalBytesOut,
 	)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get request stats: %w", err)
 	}
-	
+
 	stats.AvgLatency = int(avgLatency.Float64)
 	stats.TotalBytesIn = totalBytesIn.Int64
 	stats.TotalBytesOut = totalBytesOut.Int64
-	
+
 	if stats.TotalRequests > 0 {
 		stats.SuccessRate = float64(stats.SuccessCount) / float64(stats.TotalRequests) * 100
 		stats.CacheHitRate = float64(stats.CacheHits) / float64(stats.TotalRequests) * 100
 	}
-	
+
 	return &stats, nil
 }
 
 // RequestStats represents aggregated request statistics
 type RequestStats struct {
-	TotalRequests  int64   `json:"total_requests"`
-	SuccessCount   int64   `json:"success_count"`
-	SuccessRate    float64 `json:"success_rate"`
-	CacheHits      int64   `json:"cache_hits"`
-	CacheHitRate   float64 `json:"cache_hit_rate"`
-	AvgLatency     int     `json:"avg_latency_ms"`
-	TotalBytesIn   int64   `json:"total_bytes_in"`
-	TotalBytesOut  int64   `json:"total_bytes_out"`
+	TotalRequests int64   `json:"total_requests"`
+	SuccessCount  int64   `json:"success_count"`
+	SuccessRate   float64 `json:"success_rate"`
+	CacheHits     int64   `json:"cache_hits"`
+	CacheHitRate  float64 `json:"cache_hit_rate"`
+	AvgLatency    int     `json:"avg_latency_ms"`
+	TotalBytesIn  int64   `json:"total_bytes_in"`
+	TotalBytesOut int64   `json:"total_bytes_out"`
 }
 
 // CleanupOldLogs removes request logs older than the specified duration
 func (s *Service) CleanupOldLogs(ctx context.Context, olderThan time.Time) (int64, error) {
-	result, err := s.db.ExecContext(ctx, 
+	result, err := s.db.ExecContext(ctx,
 		"DELETE FROM requests_log WHERE created_at < $1", olderThan)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup old logs: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	return rowsAffected, nil
 }
 

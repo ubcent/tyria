@@ -7,12 +7,12 @@ import (
 
 // TokenBucket implements a token bucket rate limiter
 type TokenBucket struct {
-	mu          sync.Mutex
-	tokens      int
-	maxTokens   int
-	refillRate  int           // tokens per period
+	mu           sync.Mutex
+	tokens       int
+	maxTokens    int
+	refillRate   int // tokens per period
 	refillPeriod time.Duration
-	lastRefill  time.Time
+	lastRefill   time.Time
 }
 
 // NewTokenBucket creates a new token bucket rate limiter
@@ -61,16 +61,16 @@ func (tb *TokenBucket) AllowN(n int) bool {
 // refill adds tokens to the bucket based on elapsed time
 func (tb *TokenBucket) refill(now time.Time) {
 	elapsed := now.Sub(tb.lastRefill)
-	
+
 	if elapsed >= tb.refillPeriod {
 		periods := int(elapsed / tb.refillPeriod)
 		tokensToAdd := periods * tb.refillRate
-		
+
 		tb.tokens += tokensToAdd
 		if tb.tokens > tb.maxTokens {
 			tb.tokens = tb.maxTokens
 		}
-		
+
 		tb.lastRefill = tb.lastRefill.Add(time.Duration(periods) * tb.refillPeriod)
 	}
 }
@@ -79,10 +79,10 @@ func (tb *TokenBucket) refill(now time.Time) {
 func (tb *TokenBucket) Tokens() int {
 	tb.mu.Lock()
 	defer tb.mu.Unlock()
-	
+
 	now := time.Now()
 	tb.refill(now)
-	
+
 	return tb.tokens
 }
 
@@ -95,9 +95,9 @@ type Limiter struct {
 
 // Config holds rate limiter configuration
 type Config struct {
-	MaxTokens    int           `json:"max_tokens"`
-	RefillRate   int           `json:"refill_rate"`
-	RefillPeriod time.Duration `json:"refill_period"`
+	MaxTokens     int           `json:"max_tokens"`
+	RefillRate    int           `json:"refill_rate"`
+	RefillPeriod  time.Duration `json:"refill_period"`
 	CleanupPeriod time.Duration `json:"cleanup_period"`
 }
 
@@ -162,7 +162,7 @@ func (l *Limiter) Stats() Stats {
 
 	for key, bucket := range l.buckets {
 		stats.Buckets[key] = BucketStats{
-			Tokens: bucket.Tokens(),
+			Tokens:    bucket.Tokens(),
 			MaxTokens: bucket.maxTokens,
 		}
 	}
@@ -211,8 +211,8 @@ func (l *Limiter) cleanup() {
 	now := time.Now()
 	for key, bucket := range l.buckets {
 		// Remove buckets that are full and haven't been used for a while
-		if bucket.tokens == bucket.maxTokens && 
-		   now.Sub(bucket.lastRefill) > l.config.CleanupPeriod*2 {
+		if bucket.tokens == bucket.maxTokens &&
+			now.Sub(bucket.lastRefill) > l.config.CleanupPeriod*2 {
 			delete(l.buckets, key)
 		}
 	}
