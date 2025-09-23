@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"sync"
 	"time"
@@ -218,9 +218,9 @@ func GenerateKey(method, path, query string) string {
 func GenerateKeyWithBody(method, path, query string, body []byte) string {
 	baseKey := GenerateKey(method, path, query)
 
-	// For POST, PUT, PATCH requests with body, include MD5 hash of body
+	// For POST, PUT, PATCH requests with body, include SHA-256 hash of body
 	if (method == "POST" || method == "PUT" || method == "PATCH") && len(body) > 0 {
-		hash := md5.Sum(body)
+		hash := sha256.Sum256(body)
 		return baseKey + ":body:" + fmt.Sprintf("%x", hash)
 	}
 

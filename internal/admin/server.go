@@ -45,7 +45,9 @@ func (s *Server) writeJSONError(w http.ResponseWriter, message string, code int)
 		Message: message,
 		Code:    code,
 	}
-	json.NewEncoder(w).Encode(errorResp)
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // ProxyRoute represents a proxy route configuration
@@ -604,11 +606,15 @@ func (s *Server) getAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 func (s *Server) handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	// Get active routes count
 	var activeRoutes int
-	s.db.QueryRow("SELECT COUNT(*) FROM proxy_routes WHERE enabled = true").Scan(&activeRoutes)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM proxy_routes WHERE enabled = true").Scan(&activeRoutes); err != nil {
+		activeRoutes = 0 // Default to 0 if query fails
+	}
 
 	// Get active API keys count
 	var activeAPIKeys int
-	s.db.QueryRow("SELECT COUNT(*) FROM api_keys WHERE enabled = true").Scan(&activeAPIKeys)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM api_keys WHERE enabled = true").Scan(&activeAPIKeys); err != nil {
+		activeAPIKeys = 0 // Default to 0 if query fails
+	}
 
 	// Mock other stats for now (in real implementation, these would come from metrics)
 	stats := DashboardStats{

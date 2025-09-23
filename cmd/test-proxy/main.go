@@ -197,7 +197,9 @@ func startMockUpstream() {
 			"email": "test" + userID + "@example.com",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	mux.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +208,9 @@ func startMockUpstream() {
 			{"id": 2, "title": "Test Post 2", "body": "Another test post"},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	mux.HandleFunc("/admin/", func(w http.ResponseWriter, r *http.Request) {
@@ -216,9 +220,13 @@ func startMockUpstream() {
 			"method":  r.Method,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	})
 
 	log.Println("Starting mock upstream server on :9999")
-	http.ListenAndServe(":9999", mux)
+	if err := http.ListenAndServe(":9999", mux); err != nil {
+		log.Printf("Mock server failed: %v", err)
+	}
 }

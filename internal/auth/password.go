@@ -101,12 +101,17 @@ func parseHash(encoded string) (salt, hash []byte, config PasswordConfig, err er
 		return nil, nil, config, fmt.Errorf("invalid hash encoding: %w", err)
 	}
 
+	// Validate lengths to prevent integer overflow
+	if len(hash) > 0xFFFFFFFF || len(salt) > 0xFFFFFFFF {
+		return nil, nil, config, fmt.Errorf("hash or salt length exceeds maximum allowed size")
+	}
+
 	config = PasswordConfig{
 		Time:    time,
 		Memory:  memory,
 		Threads: threads,
-		KeyLen:  uint32(len(hash)),
-		SaltLen: uint32(len(salt)),
+		KeyLen:  uint32(len(hash)),  // #nosec G115 - bounds checked above
+		SaltLen: uint32(len(salt)), // #nosec G115 - bounds checked above
 	}
 
 	return salt, hash, config, nil
