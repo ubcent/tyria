@@ -50,27 +50,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int, limit, offset i
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-
-	rows, err := s.db.QueryContext(ctx, query, tenantID, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get request logs for tenant: %w", err)
-	}
-	defer rows.Close()
-
-	var logs []*models.RequestLog
-	for rows.Next() {
-		log := &models.RequestLog{}
-		err := rows.Scan(
-			&log.ID, &log.TenantID, &log.RouteID, &log.StatusCode, &log.LatencyMs,
-			&log.CacheStatus, &log.BytesIn, &log.BytesOut, &log.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan request log: %w", err)
-		}
-		logs = append(logs, log)
-	}
-
-	return logs, nil
+	return s.getRequestLogs(ctx, query, tenantID, limit, offset)
 }
 
 // GetByRoute retrieves request logs for a specific route with pagination
@@ -82,10 +62,14 @@ func (s *Service) GetByRoute(ctx context.Context, routeID int, limit, offset int
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
+	return s.getRequestLogs(ctx, query, routeID, limit, offset)
+}
 
-	rows, err := s.db.QueryContext(ctx, query, routeID, limit, offset)
+// getRequestLogs is a helper function that executes a query and scans the results
+func (s *Service) getRequestLogs(ctx context.Context, query string, args ...interface{}) ([]*models.RequestLog, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get request logs for route: %w", err)
+		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer rows.Close()
 
