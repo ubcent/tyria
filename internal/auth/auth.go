@@ -77,12 +77,12 @@ func (m *Manager) RemoveKey(key string) {
 func (m *Manager) GetKey(key string) (*APIKey, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	apiKey, exists := m.keys[key]
 	if !exists {
 		return nil, false
 	}
-	
+
 	// Return a copy to prevent external modification
 	keyCopy := *apiKey
 	return &keyCopy, true
@@ -103,7 +103,7 @@ func (m *Manager) ValidateKey(key string) (*APIKey, error) {
 			if !apiKey.Enabled {
 				return nil, ErrAPIKeyDisabled
 			}
-			
+
 			// Return a copy
 			keyCopy := *apiKey
 			return &keyCopy, nil

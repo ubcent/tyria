@@ -1,3 +1,5 @@
+// Package tenant provides tenant management functionality for the edge.link proxy service.
+// It handles tenant operations, queries, and database interactions for multi-tenant architecture.
 package tenant
 
 import (
@@ -5,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	//nolint:depguard // Internal models are used intentionally via type alias for backward compatibility
 	"github.com/ubcent/edge.link/internal/models"
 )
 
@@ -29,15 +32,15 @@ func (s *Service) Create(ctx context.Context, tenant *Tenant) error {
 		VALUES ($1, $2, $3)
 		RETURNING id, created_at, updated_at
 	`
-	
+
 	err := s.db.QueryRowContext(ctx, query,
 		tenant.Name, tenant.Plan, tenant.Status,
 	).Scan(&tenant.ID, &tenant.CreatedAt, &tenant.UpdatedAt)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create tenant: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -48,20 +51,20 @@ func (s *Service) GetByID(ctx context.Context, id int) (*Tenant, error) {
 		FROM tenants
 		WHERE id = $1
 	`
-	
+
 	tenant := &Tenant{}
 	err := s.db.QueryRowContext(ctx, query, id).Scan(
 		&tenant.ID, &tenant.Name, &tenant.Plan, &tenant.Status,
 		&tenant.CreatedAt, &tenant.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("tenant not found")
 		}
 		return nil, fmt.Errorf("failed to get tenant: %w", err)
 	}
-	
+
 	return tenant, nil
 }
 
@@ -73,13 +76,13 @@ func (s *Service) List(ctx context.Context, limit, offset int) ([]*Tenant, error
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
 	`
-	
+
 	rows, err := s.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
 	}
-	defer rows.Close()
-	
+	defer func() { _ = rows.Close() }()
+
 	var tenants []*Tenant
 	for rows.Next() {
 		tenant := &Tenant{}
@@ -92,7 +95,11 @@ func (s *Service) List(ctx context.Context, limit, offset int) ([]*Tenant, error
 		}
 		tenants = append(tenants, tenant)
 	}
-	
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over tenant rows: %w", err)
+	}
+
 	return tenants, nil
 }
 
@@ -104,15 +111,15 @@ func (s *Service) Update(ctx context.Context, tenant *Tenant) error {
 		WHERE id = $4
 		RETURNING updated_at
 	`
-	
+
 	err := s.db.QueryRowContext(ctx, query,
 		tenant.Name, tenant.Plan, tenant.Status, tenant.ID,
 	).Scan(&tenant.UpdatedAt)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to update tenant: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -122,6 +129,6 @@ func (s *Service) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete tenant: %w", err)
 	}
-	
+
 	return nil
 }

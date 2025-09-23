@@ -1,3 +1,5 @@
+// Package migrations provides database migration functionality for the edge.link proxy service.
+// It handles schema updates and data migrations using the goose migration tool.
 package migrations
 
 import (
@@ -5,7 +7,7 @@ import (
 	"embed"
 	"fmt"
 
-	"github.com/pressly/goose/v3"
+	goose "github.com/pressly/goose/v3"
 )
 
 //go:embed *.sql

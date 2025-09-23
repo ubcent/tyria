@@ -144,7 +144,7 @@ func TestGenerateKeyWithBody(t *testing.T) {
 		},
 		{
 			name:           "POST request with body includes hash",
-			method:         "POST", 
+			method:         "POST",
 			path:           "/api/users",
 			query:          "",
 			body:           []byte(`{"name": "test"}`),
@@ -172,7 +172,7 @@ func TestGenerateKeyWithBody(t *testing.T) {
 		{
 			name:           "PATCH request with body includes hash",
 			method:         "PATCH",
-			path:           "/api/users/1", 
+			path:           "/api/users/1",
 			query:          "",
 			body:           []byte(`{"status": "active"}`),
 			expectedPrefix: "PATCH:/api/users/1:body:",
@@ -183,7 +183,7 @@ func TestGenerateKeyWithBody(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			result := GenerateKeyWithBody(test.method, test.path, test.query, test.body)
-			
+
 			if test.hasBodyHash {
 				if !strings.HasPrefix(result, test.expectedPrefix) {
 					t.Errorf("Expected result to start with %s, got %s", test.expectedPrefix, result)
@@ -198,7 +198,7 @@ func TestGenerateKeyWithBody(t *testing.T) {
 			}
 		})
 	}
-	
+
 	// Test that same body produces same hash
 	body := []byte(`{"name": "test"}`)
 	key1 := GenerateKeyWithBody("POST", "/api/users", "", body)
@@ -206,7 +206,7 @@ func TestGenerateKeyWithBody(t *testing.T) {
 	if key1 != key2 {
 		t.Errorf("Expected same body to produce same key, got %s != %s", key1, key2)
 	}
-	
+
 	// Test that different bodies produce different hashes
 	body2 := []byte(`{"name": "different"}`)
 	key3 := GenerateKeyWithBody("POST", "/api/users", "", body2)

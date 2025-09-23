@@ -28,16 +28,16 @@ func (s *Service) Log(ctx context.Context, log *models.RequestLog) error {
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
-	
+
 	err := s.db.QueryRowContext(ctx, query,
 		log.TenantID, log.RouteID, log.StatusCode, log.LatencyMs,
 		log.CacheStatus, log.BytesIn, log.BytesOut, log.CreatedAt,
 	).Scan(&log.ID)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to create request log: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -50,27 +50,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int, limit, offset i
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
-	rows, err := s.db.QueryContext(ctx, query, tenantID, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get request logs for tenant: %w", err)
-	}
-	defer rows.Close()
-	
-	var logs []*models.RequestLog
-	for rows.Next() {
-		log := &models.RequestLog{}
-		err := rows.Scan(
-			&log.ID, &log.TenantID, &log.RouteID, &log.StatusCode, &log.LatencyMs,
-			&log.CacheStatus, &log.BytesIn, &log.BytesOut, &log.CreatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan request log: %w", err)
-		}
-		logs = append(logs, log)
-	}
-	
-	return logs, nil
+	return s.getRequestLogs(ctx, query, tenantID, limit, offset)
 }
 
 // GetByRoute retrieves request logs for a specific route with pagination
@@ -82,13 +62,17 @@ func (s *Service) GetByRoute(ctx context.Context, routeID int, limit, offset int
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
-	
-	rows, err := s.db.QueryContext(ctx, query, routeID, limit, offset)
+	return s.getRequestLogs(ctx, query, routeID, limit, offset)
+}
+
+// getRequestLogs is a helper function that executes a query and scans the results
+func (s *Service) getRequestLogs(ctx context.Context, query string, args ...interface{}) ([]*models.RequestLog, error) {
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get request logs for route: %w", err)
+		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
-	
+	defer func() { _ = rows.Close() }()
+
 	var logs []*models.RequestLog
 	for rows.Next() {
 		log := &models.RequestLog{}
@@ -101,7 +85,11 @@ func (s *Service) GetByRoute(ctx context.Context, routeID int, limit, offset int
 		}
 		logs = append(logs, log)
 	}
-	
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over request logs: %w", err)
+	}
+
 	return logs, nil
 }
 
@@ -118,61 +106,63 @@ func (s *Service) GetStats(ctx context.Context, tenantID int, since time.Time) (
 		FROM requests_log
 		WHERE tenant_id = $1 AND created_at >= $2
 	`
-	
+
 	var stats RequestStats
 	var avgLatency sql.NullFloat64
 	var totalBytesIn, totalBytesOut sql.NullInt64
-	
+
 	err := s.db.QueryRowContext(ctx, query, tenantID, since).Scan(
 		&stats.TotalRequests, &avgLatency, &stats.SuccessCount,
 		&stats.CacheHits, &totalBytesIn, &totalBytesOut,
 	)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get request stats: %w", err)
 	}
-	
+
 	stats.AvgLatency = int(avgLatency.Float64)
 	stats.TotalBytesIn = totalBytesIn.Int64
 	stats.TotalBytesOut = totalBytesOut.Int64
-	
+
 	if stats.TotalRequests > 0 {
 		stats.SuccessRate = float64(stats.SuccessCount) / float64(stats.TotalRequests) * 100
 		stats.CacheHitRate = float64(stats.CacheHits) / float64(stats.TotalRequests) * 100
 	}
-	
+
 	return &stats, nil
 }
 
 // RequestStats represents aggregated request statistics
 type RequestStats struct {
-	TotalRequests  int64   `json:"total_requests"`
-	SuccessCount   int64   `json:"success_count"`
-	SuccessRate    float64 `json:"success_rate"`
-	CacheHits      int64   `json:"cache_hits"`
-	CacheHitRate   float64 `json:"cache_hit_rate"`
-	AvgLatency     int     `json:"avg_latency_ms"`
-	TotalBytesIn   int64   `json:"total_bytes_in"`
-	TotalBytesOut  int64   `json:"total_bytes_out"`
+	TotalRequests int64   `json:"total_requests"`
+	SuccessCount  int64   `json:"success_count"`
+	SuccessRate   float64 `json:"success_rate"`
+	CacheHits     int64   `json:"cache_hits"`
+	CacheHitRate  float64 `json:"cache_hit_rate"`
+	AvgLatency    int     `json:"avg_latency_ms"`
+	TotalBytesIn  int64   `json:"total_bytes_in"`
+	TotalBytesOut int64   `json:"total_bytes_out"`
 }
 
 // CleanupOldLogs removes request logs older than the specified duration
 func (s *Service) CleanupOldLogs(ctx context.Context, olderThan time.Time) (int64, error) {
-	result, err := s.db.ExecContext(ctx, 
+	result, err := s.db.ExecContext(ctx,
 		"DELETE FROM requests_log WHERE created_at < $1", olderThan)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup old logs: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	return rowsAffected, nil
 }
 
 // generateVerificationToken generates a random verification token
+//
+//nolint:unused // not used directly yet; reserved for future email verification flows
 func (s *Service) generateVerificationToken() (string, error) {
 	bytes := make([]byte, 24)
 	if _, err := rand.Read(bytes); err != nil {

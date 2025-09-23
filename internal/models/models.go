@@ -1,3 +1,5 @@
+// Package models defines the data structures used throughout the edge.link proxy service.
+// It includes definitions for users, routes, API keys, request logs, and other core entities.
 package models
 
 import (
@@ -9,8 +11,8 @@ import (
 type Tenant struct {
 	ID        int       `json:"id" db:"id"`
 	Name      string    `json:"name" db:"name"`
-	Plan      string    `json:"plan" db:"plan"`       // free, pro, enterprise
-	Status    string    `json:"status" db:"status"`   // active, suspended, canceled
+	Plan      string    `json:"plan" db:"plan"`     // free, pro, enterprise
+	Status    string    `json:"status" db:"status"` // active, suspended, canceled
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -31,8 +33,8 @@ type APIKey struct {
 	ID         int        `json:"id" db:"id"`
 	TenantID   int        `json:"tenant_id" db:"tenant_id"`
 	Name       string     `json:"name" db:"name"`
-	Prefix     string     `json:"prefix" db:"prefix"`           // Visible part of key
-	Hash       string     `json:"-" db:"hash"`                  // Hidden hashed key
+	Prefix     string     `json:"prefix" db:"prefix"` // Visible part of key
+	Hash       string     `json:"-" db:"hash"`        // Hidden hashed key
 	LastUsedAt *time.Time `json:"last_used_at" db:"last_used_at"`
 	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at" db:"updated_at"`

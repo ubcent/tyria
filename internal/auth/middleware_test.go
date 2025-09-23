@@ -18,7 +18,7 @@ func TestAuthMiddlewareJSONErrors(t *testing.T) {
 
 		protectedHandler := middleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		}))
 
 		protectedHandler.ServeHTTP(w, req)
@@ -64,7 +64,7 @@ func TestAuthMiddlewareJSONErrors(t *testing.T) {
 
 		protectedHandler := middleware.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		}))
 
 		protectedHandler.ServeHTTP(w, req)
@@ -117,7 +117,7 @@ func TestAuthMiddlewareJSONErrors(t *testing.T) {
 		// Require admin role but user has viewer role
 		adminHandler := middleware.RequireRole(RoleAdmin)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("admin success"))
+			_, _ = w.Write([]byte("admin success"))
 		}))
 
 		// First authenticate, then check role

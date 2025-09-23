@@ -16,7 +16,7 @@ func TestAPIKeyGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create table
 	_, err = db.Exec(`

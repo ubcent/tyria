@@ -1,10 +1,12 @@
+// Package auth provides authentication and authorization functionality for the edge.link proxy service.
+// It includes JWT token management, password hashing, and middleware for securing endpoints.
 package auth
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 // JWTClaims represents the JWT claims for authentication

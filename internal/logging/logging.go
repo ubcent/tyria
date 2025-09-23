@@ -1,3 +1,5 @@
+// Package logging provides centralized logging functionality for the edge.link proxy service.
+// It supports multiple output formats and destinations including file and console output.
 package logging
 
 import (
@@ -45,7 +47,7 @@ func New(cfg Config) (*Logger, error) {
 		output = os.Stderr
 	default:
 		// Assume it's a file path
-		file, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			return nil, err
 		}
@@ -74,14 +76,14 @@ func New(cfg Config) (*Logger, error) {
 // WithTenant adds tenant context to log entries
 func (l *Logger) WithTenant(tenantID int) *Logger {
 	return &Logger{
-		Logger: l.Logger.With("tenant_id", tenantID),
+		Logger: l.With("tenant_id", tenantID),
 	}
 }
 
 // WithRequest adds request context to log entries
 func (l *Logger) WithRequest(method, path, clientIP string) *Logger {
 	return &Logger{
-		Logger: l.Logger.With(
+		Logger: l.With(
 			"method", method,
 			"path", path,
 			"client_ip", clientIP,
@@ -92,6 +94,6 @@ func (l *Logger) WithRequest(method, path, clientIP string) *Logger {
 // WithRoute adds route context to log entries
 func (l *Logger) WithRoute(routePath string) *Logger {
 	return &Logger{
-		Logger: l.Logger.With("route_path", routePath),
+		Logger: l.With("route_path", routePath),
 	}
 }

@@ -19,6 +19,13 @@ import (
 	"github.com/ubcent/edge.link/internal/validation"
 )
 
+// HTTP method constants
+const (
+	httpMethodPOST  = "POST"
+	httpMethodPUT   = "PUT"
+	httpMethodPATCH = "PATCH"
+)
+
 // Service represents the proxy service
 type Service struct {
 	config    *config.Config
@@ -156,10 +163,10 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	cacheHit := false
 	var requestBody []byte
 	var cacheKey string
-	
+
 	if route.Cache.Enabled {
 		// Read request body for POST/PUT/PATCH requests to include in cache key
-		if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+		if r.Method == httpMethodPOST || r.Method == httpMethodPUT || r.Method == httpMethodPATCH {
 			var err error
 			requestBody, err = io.ReadAll(r.Body)
 			if err != nil {
@@ -173,13 +180,15 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			cacheKey = cache.GenerateKey(r.Method, r.URL.Path, r.URL.RawQuery)
 		}
-		
+
 		// Check cache for all cacheable methods (GET is most common, but POST results can be cached too)
 		if cachedData, found := s.cache.Get(cacheKey); found {
 			w.Header().Set("X-Cache", "HIT")
 			w.Header().Set("Content-Type", "application/json")
-			w.Write(cachedData)
-			cacheHit = true
+			if _, err := w.Write(cachedData); err != nil {
+				http.Error(w, "Failed to write cached response", http.StatusInternalServerError)
+				return
+			}
 			s.metrics.IncrementCachedRequests()
 			s.metrics.RecordRouteMetric(route.Path, true, time.Since(start), false)
 			return
@@ -197,7 +206,7 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		var result *validation.ValidationResult
 		var body []byte
 		var err error
-		
+
 		// Use already read body if available, otherwise read it
 		if requestBody != nil {
 			body = requestBody
@@ -224,10 +233,12 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			// Return validation errors
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"error":             "Request validation failed",
 				"validation_errors": result.Errors,
-			})
+			}); err != nil {
+				http.Error(w, "Failed to encode validation errors", http.StatusInternalServerError)
+			}
 			s.metrics.RecordRouteMetric(route.Path, false, time.Since(start), true)
 			return
 		}
@@ -254,18 +265,18 @@ func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *co
 
 	// Create reverse proxy
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	
+
 	// Customize the director to modify the request
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		originalDirector(req)
-		
+
 		// Remove the route path prefix from the request URL
 		req.URL.Path = strings.TrimPrefix(req.URL.Path, route.Path)
 		if req.URL.Path == "" {
 			req.URL.Path = "/"
 		}
-		
+
 		// Set headers
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Set("X-Forwarded-Proto", "http")
@@ -282,7 +293,7 @@ func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *co
 
 	// Record metrics
 	s.metrics.IncrementProxiedRequests()
-	s.metrics.RecordRouteMetric(route.Path, cacheHit, time.Since(start), wrapped.statusCode >= 400)
+	s.metrics.RecordRouteMetric(route.Path, cacheHit, time.Since(start), wrapped.statusCode >= httpErrorStatusCode)
 }
 
 // findRoute finds the matching route for a request
@@ -309,7 +320,12 @@ type cachingResponseWriter struct {
 	statusCode int
 }
 
-func newCachingResponseWriter(w http.ResponseWriter, route *config.RouteConfig, cacheImpl cache.Interface, cacheKey string) *cachingResponseWriter {
+func newCachingResponseWriter(
+	w http.ResponseWriter,
+	route *config.RouteConfig,
+	cacheImpl cache.Interface,
+	cacheKey string,
+) *cachingResponseWriter {
 	return &cachingResponseWriter{
 		ResponseWriter: w,
 		buffer:         &bytes.Buffer{},
@@ -326,12 +342,12 @@ func (crw *cachingResponseWriter) Write(data []byte) (int, error) {
 		crw.buffer.Write(data)
 	}
 	n, err := crw.ResponseWriter.Write(data)
-	
+
 	// Cache the response when done writing
 	if crw.route.Cache.Enabled && crw.statusCode >= 200 && crw.statusCode < 300 {
 		go crw.writeToCache()
 	}
-	
+
 	return n, err
 }
 
@@ -344,7 +360,7 @@ func (crw *cachingResponseWriter) writeToCache() {
 	if crw.route.Cache.Enabled && crw.statusCode >= 200 && crw.statusCode < 300 && crw.buffer.Len() > 0 {
 		ttl := crw.route.Cache.TTL
 		if ttl == 0 {
-			ttl = 5 * time.Minute // Default TTL
+			ttl = defaultCacheTTL // Default TTL
 		}
 		crw.cache.SetWithTTL(crw.cacheKey, crw.buffer.Bytes(), ttl)
 	}
@@ -392,7 +408,7 @@ func (s *Service) GetMetrics() *metrics.Metrics {
 
 func (s *Service) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
 }
 
 func (s *Service) statsHandler(w http.ResponseWriter, r *http.Request) {
@@ -412,14 +428,14 @@ func (s *Service) cacheStatsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) cacheClearHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != httpMethodPOST {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	s.cache.Clear()
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"message": "Cache cleared successfully"}`)
+	_, _ = fmt.Fprintf(w, `{"message": "Cache cleared successfully"}`)
 }
 
 func (s *Service) authKeysHandler(w http.ResponseWriter, r *http.Request) {

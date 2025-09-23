@@ -75,7 +75,9 @@ func (a *AuthServer) writeJSONError(w http.ResponseWriter, message string, code 
 		Message: message,
 		Code:    code,
 	}
-	json.NewEncoder(w).Encode(errorResp)
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // HandleSignup handles user registration
@@ -157,7 +159,9 @@ func (a *AuthServer) HandleSignup(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // HandleSignin handles user authentication
@@ -214,7 +218,9 @@ func (a *AuthServer) HandleSignin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // HandleSignout handles user logout
@@ -236,9 +242,11 @@ func (a *AuthServer) HandleSignout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"message": "Logged out successfully",
-	})
+	}); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // HandleProfile returns the current user's profile
@@ -264,7 +272,9 @@ func (a *AuthServer) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	user.HashedPassword = ""
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // SetupAuthRoutes sets up authentication routes
@@ -272,7 +282,7 @@ func (a *AuthServer) SetupAuthRoutes(router *http.ServeMux) {
 	router.HandleFunc("/api/auth/signup", a.HandleSignup)
 	router.HandleFunc("/api/auth/signin", a.HandleSignin)
 	router.HandleFunc("/api/auth/signout", a.HandleSignout)
-	
+
 	// Protected routes
 	authMiddleware := auth.NewAuthMiddleware(a.jwtManager)
 	router.Handle("/api/auth/profile", authMiddleware.RequireAuth(http.HandlerFunc(a.HandleProfile)))
@@ -304,7 +314,9 @@ func (a *AuthServer) HandleConfirmEmail(w http.ResponseWriter, r *http.Request) 
 	// TODO: Implement actual email verification logic
 	// For now, just return success
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"message": "Email confirmed successfully",
-	})
+	}); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }

@@ -1,3 +1,5 @@
+// Package admin provides administrative server functionality for the edge.link proxy service.
+// It includes authentication, user management, route configuration, and API key management.
 package admin
 
 import (
@@ -13,12 +15,19 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
-	
+
 	"github.com/ubcent/edge.link/internal/apikeys"
 	"github.com/ubcent/edge.link/internal/models"
 	"github.com/ubcent/edge.link/internal/routes"
+)
+
+// HTTP method constants
+const (
+	httpMethodGET    = "GET"
+	httpMethodPOST   = "POST"
+	httpMethodPUT    = "PUT"
+	httpMethodDELETE = "DELETE"
 )
 
 // ErrorResponse represents a JSON error response
@@ -28,60 +37,68 @@ type ErrorResponse struct {
 	Code    int    `json:"code"`
 }
 
+// writeJSON is a helper function to encode JSON responses with proper error handling
+func writeJSON(w http.ResponseWriter, data interface{}) {
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+	}
+}
+
 // Server represents the admin API server
 type Server struct {
-	db            *sql.DB
-	router        *mux.Router
+	db             *sql.DB
+	router         *mux.Router
 	apiKeysService *apikeys.Service
-	routesService *routes.Service
+	routesService  *routes.Service
 }
 
 // writeJSONError writes a JSON formatted error response
 func (s *Server) writeJSONError(w http.ResponseWriter, message string, code int) {
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	errorResp := ErrorResponse{
 		Error:   http.StatusText(code),
 		Message: message,
 		Code:    code,
 	}
-	json.NewEncoder(w).Encode(errorResp)
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // ProxyRoute represents a proxy route configuration
 type ProxyRoute struct {
-	ID                     int       `json:"id"`
-	Path                   string    `json:"path"`
-	Target                 string    `json:"target"`
-	Methods                []string  `json:"methods"`
-	CacheEnabled           bool      `json:"cache_enabled"`
-	CacheTTL               int       `json:"cache_ttl"`
-	RateLimitEnabled       bool      `json:"rate_limit_enabled"`
-	RateLimitRate          int       `json:"rate_limit_rate"`
-	RateLimitBurst         int       `json:"rate_limit_burst"`
-	RateLimitPeriod        int       `json:"rate_limit_period"`
-	RateLimitPerClient     bool      `json:"rate_limit_per_client"`
-	AuthRequired           bool      `json:"auth_required"`
-	AuthKeys               []string  `json:"auth_keys"`
-	ValidationEnabled      bool      `json:"validation_enabled"`
-	ValidationRequestSchema *string  `json:"validation_request_schema"`
-	ValidationResponseSchema *string `json:"validation_response_schema"`
-	Enabled                bool      `json:"enabled"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                       int       `json:"id"`
+	Path                     string    `json:"path"`
+	Target                   string    `json:"target"`
+	Methods                  []string  `json:"methods"`
+	CacheEnabled             bool      `json:"cache_enabled"`
+	CacheTTL                 int       `json:"cache_ttl"`
+	RateLimitEnabled         bool      `json:"rate_limit_enabled"`
+	RateLimitRate            int       `json:"rate_limit_rate"`
+	RateLimitBurst           int       `json:"rate_limit_burst"`
+	RateLimitPeriod          int       `json:"rate_limit_period"`
+	RateLimitPerClient       bool      `json:"rate_limit_per_client"`
+	AuthRequired             bool      `json:"auth_required"`
+	AuthKeys                 []string  `json:"auth_keys"`
+	ValidationEnabled        bool      `json:"validation_enabled"`
+	ValidationRequestSchema  *string   `json:"validation_request_schema"`
+	ValidationResponseSchema *string   `json:"validation_response_schema"`
+	Enabled                  bool      `json:"enabled"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
 }
 
 // APIKey represents an API key configuration
 type APIKey struct {
-	ID          int       `json:"id"`
-	KeyValue    string    `json:"key_value"`
-	Name        string    `json:"name"`
-	Permissions []string  `json:"permissions"`
-	RateLimit   int       `json:"rate_limit"`
-	Enabled     bool      `json:"enabled"`
+	ID          int        `json:"id"`
+	KeyValue    string     `json:"key_value"`
+	Name        string     `json:"name"`
+	Permissions []string   `json:"permissions"`
+	RateLimit   int        `json:"rate_limit"`
+	Enabled     bool       `json:"enabled"`
 	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // CreateAPIKeyRequest represents the request to create an API key
@@ -100,12 +117,12 @@ type CreateAPIKeyResponse struct {
 
 // DashboardStats represents dashboard statistics
 type DashboardStats struct {
-	TotalRequests       int64   `json:"total_requests"`
-	AvgResponseTime     float64 `json:"avg_response_time"`
-	SuccessRate         float64 `json:"success_rate"`
-	CacheHitRate        float64 `json:"cache_hit_rate"`
-	ActiveRoutes        int     `json:"active_routes"`
-	ActiveAPIKeys       int     `json:"active_api_keys"`
+	TotalRequests   int64   `json:"total_requests"`
+	AvgResponseTime float64 `json:"avg_response_time"`
+	SuccessRate     float64 `json:"success_rate"`
+	CacheHitRate    float64 `json:"cache_hit_rate"`
+	ActiveRoutes    int     `json:"active_routes"`
+	ActiveAPIKeys   int     `json:"active_api_keys"`
 }
 
 // NewServer creates a new admin API server
@@ -150,7 +167,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/auth/signin", authServer.HandleSignin).Methods("POST", "OPTIONS")
 	api.HandleFunc("/auth/signout", authServer.HandleSignout).Methods("POST", "OPTIONS")
 	api.HandleFunc("/auth/confirm-email", authServer.HandleConfirmEmail).Methods("POST", "OPTIONS")
-	
+
 	// Protected auth routes
 	authMiddleware := authServer.GetAuthMiddleware()
 	protectedAuth := api.PathPrefix("/auth").Subrouter()
@@ -165,11 +182,11 @@ func (s *Server) setupRoutes() {
 	v1 := api.PathPrefix("/v1").Subrouter()
 	v1.HandleFunc("/api-keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	v1.HandleFunc("/api-keys/{id}", s.handleAPIKey).Methods("DELETE", "OPTIONS")
-	
+
 	// Routes management - v1 endpoints with validation
 	v1.HandleFunc("/routes", s.handleV1Routes).Methods("GET", "POST", "OPTIONS")
 	v1.HandleFunc("/routes/{id}", s.handleV1Route).Methods("GET", "PUT", "DELETE", "OPTIONS")
-	
+
 	// Legacy API Keys management (for backward compatibility)
 	api.HandleFunc("/keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	api.HandleFunc("/keys/{id}", s.handleAPIKey).Methods("GET", "PUT", "DELETE", "OPTIONS")
@@ -209,9 +226,9 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 // handleRoutes handles routes collection endpoints
 func (s *Server) handleRoutes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getRoutes(w, r)
-	case "POST":
+	case httpMethodPOST:
 		s.createRoute(w, r)
 	}
 }
@@ -226,11 +243,11 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getRoute(w, r, id)
-	case "PUT":
+	case httpMethodPUT:
 		s.updateRoute(w, r, id)
-	case "DELETE":
+	case httpMethodDELETE:
 		s.deleteRoute(w, r, id)
 	}
 }
@@ -253,7 +270,7 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var routes []ProxyRoute
 	for rows.Next() {
@@ -279,8 +296,13 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 		routes = append(routes, route)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(routes)
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating routes: %v", err)
+		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, routes)
 }
 
 // createRoute creates a new route
@@ -318,9 +340,8 @@ func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // updateRoute updates an existing route
@@ -360,8 +381,7 @@ func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	route.ID = id
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // deleteRoute deletes a route
@@ -413,16 +433,15 @@ func (s *Server) getRoute(w http.ResponseWriter, r *http.Request, id int) {
 	route.Methods = []string(methods)
 	route.AuthKeys = []string(authKeys)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // handleAPIKeys handles API keys collection endpoints
 func (s *Server) handleAPIKeys(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getAPIKeys(w, r)
-	case "POST":
+	case httpMethodPOST:
 		s.createAPIKey(w, r)
 	}
 }
@@ -437,11 +456,11 @@ func (s *Server) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getAPIKey(w, r, id)
-	case "PUT":
+	case httpMethodPUT:
 		s.updateAPIKey(w, r, id)
-	case "DELETE":
+	case httpMethodDELETE:
 		s.deleteAPIKey(w, r, id)
 	}
 }
@@ -449,7 +468,7 @@ func (s *Server) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 // getAPIKeys retrieves all API keys for the tenant
 func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	keys, err := s.apiKeysService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting API keys for tenant %d: %v", tenantID, err)
@@ -469,14 +488,13 @@ func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, response)
 }
 
 // createAPIKey creates a new API key
 func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	var req CreateAPIKeyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
@@ -514,9 +532,8 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: apiKey.CreatedAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, response)
 }
 
 // updateAPIKey updates an existing API key
@@ -549,14 +566,13 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	key.ID = id
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(key)
+	writeJSON(w, key)
 }
 
 // deleteAPIKey deletes an API key
 func (s *Server) deleteAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	err := s.apiKeysService.Delete(r.Context(), id, tenantID)
 	if err != nil {
 		log.Printf("Error deleting API key %d for tenant %d: %v", id, tenantID, err)
@@ -596,19 +612,22 @@ func (s *Server) getAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	// Convert pq.StringArray to []string
 	key.Permissions = []string(permissions)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(key)
+	writeJSON(w, key)
 }
 
 // handleDashboardStats handles dashboard statistics
 func (s *Server) handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	// Get active routes count
 	var activeRoutes int
-	s.db.QueryRow("SELECT COUNT(*) FROM proxy_routes WHERE enabled = true").Scan(&activeRoutes)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM proxy_routes WHERE enabled = true").Scan(&activeRoutes); err != nil {
+		activeRoutes = 0 // Default to 0 if query fails
+	}
 
 	// Get active API keys count
 	var activeAPIKeys int
-	s.db.QueryRow("SELECT COUNT(*) FROM api_keys WHERE enabled = true").Scan(&activeAPIKeys)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM api_keys WHERE enabled = true").Scan(&activeAPIKeys); err != nil {
+		activeAPIKeys = 0 // Default to 0 if query fails
+	}
 
 	// Mock other stats for now (in real implementation, these would come from metrics)
 	stats := DashboardStats{
@@ -620,8 +639,7 @@ func (s *Server) handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		ActiveAPIKeys:   activeAPIKeys,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	writeJSON(w, stats)
 }
 
 // handleDashboardActivity handles dashboard activity feed
@@ -648,14 +666,12 @@ func (s *Server) handleDashboardActivity(w http.ResponseWriter, r *http.Request)
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(activity)
+	writeJSON(w, activity)
 }
 
 // handleHealth handles health check
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, map[string]string{
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
@@ -677,24 +693,24 @@ func validateURL(urlStr string) error {
 	if urlStr == "" {
 		return fmt.Errorf("URL cannot be empty")
 	}
-	
+
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return fmt.Errorf("invalid URL format: %w", err)
 	}
-	
+
 	if parsedURL.Scheme == "" {
 		return fmt.Errorf("URL must include a scheme (http:// or https://)")
 	}
-	
+
 	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
 		return fmt.Errorf("URL scheme must be http or https")
 	}
-	
+
 	if parsedURL.Host == "" {
 		return fmt.Errorf("URL must include a host")
 	}
-	
+
 	return nil
 }
 
@@ -714,7 +730,7 @@ func validateJSON(jsonStr string) error {
 	if jsonStr == "" {
 		return nil // Empty JSON is allowed
 	}
-	
+
 	var temp interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &temp); err != nil {
 		return fmt.Errorf("invalid JSON format: %w", err)
@@ -727,47 +743,47 @@ func (s *Server) validateRouteInput(route *models.Route) error {
 	if route.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	
+
 	if route.MatchPath == "" {
 		return fmt.Errorf("match_path is required")
 	}
-	
+
 	if err := validateURL(route.UpstreamURL); err != nil {
 		return fmt.Errorf("upstream_url validation failed: %w", err)
 	}
-	
+
 	if err := validateAuthMode(route.AuthMode); err != nil {
 		return err
 	}
-	
+
 	// Validate JSON fields
 	if len(route.HeadersJSON) > 0 {
 		if err := validateJSON(string(route.HeadersJSON)); err != nil {
 			return fmt.Errorf("headers_json validation failed: %w", err)
 		}
 	}
-	
+
 	if len(route.CachingPolicyJSON) > 0 {
 		if err := validateJSON(string(route.CachingPolicyJSON)); err != nil {
 			return fmt.Errorf("caching_policy_json validation failed: %w", err)
 		}
 	}
-	
+
 	if len(route.RateLimitPolicyJSON) > 0 {
 		if err := validateJSON(string(route.RateLimitPolicyJSON)); err != nil {
 			return fmt.Errorf("rate_limit_policy_json validation failed: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
 // handleV1Routes handles v1 routes collection endpoints with validation
 func (s *Server) handleV1Routes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getV1Routes(w, r)
-	case "POST":
+	case httpMethodPOST:
 		s.createV1Route(w, r)
 	}
 }
@@ -782,11 +798,11 @@ func (s *Server) handleV1Route(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getV1Route(w, r, id)
-	case "PUT":
+	case httpMethodPUT:
 		s.updateV1Route(w, r, id)
-	case "DELETE":
+	case httpMethodDELETE:
 		s.deleteV1Route(w, r, id)
 	}
 }
@@ -794,7 +810,7 @@ func (s *Server) handleV1Route(w http.ResponseWriter, r *http.Request) {
 // getV1Routes retrieves all routes using the new v1 format
 func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	routes, err := s.routesService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting routes for tenant %d: %v", tenantID, err)
@@ -802,14 +818,13 @@ func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(routes)
+	writeJSON(w, routes)
 }
 
 // createV1Route creates a new route with validation
 func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	var route models.Route
 	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
 		s.writeJSONError(w, "Invalid JSON", http.StatusBadRequest)
@@ -832,15 +847,14 @@ func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // updateV1Route updates an existing route with validation
 func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	// First, get the existing route to ensure it belongs to the tenant
 	existingRoute, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
@@ -881,14 +895,13 @@ func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // deleteV1Route deletes a route
 func (s *Server) deleteV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	// Verify the route belongs to the tenant before deleting
 	existingRoute, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
@@ -918,7 +931,7 @@ func (s *Server) deleteV1Route(w http.ResponseWriter, r *http.Request, id int) {
 // getV1Route retrieves a single route
 func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	route, err := s.routesService.GetByID(r.Context(), id)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -936,6 +949,5 @@ func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }

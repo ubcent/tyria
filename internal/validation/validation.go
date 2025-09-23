@@ -126,10 +126,12 @@ func (v *Validator) Middleware(requestSchema, responseSchema string) func(http.H
 				if !result.Valid {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusBadRequest)
-					json.NewEncoder(w).Encode(map[string]interface{}{
+					if err := json.NewEncoder(w).Encode(map[string]interface{}{
 						"error":             "Request validation failed",
 						"validation_errors": result.Errors,
-					})
+					}); err != nil {
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
+					}
 					return
 				}
 
@@ -140,10 +142,10 @@ func (v *Validator) Middleware(requestSchema, responseSchema string) func(http.H
 			// If response validation is needed, wrap the response writer
 			if responseSchema != "" {
 				wrapped := &validatingResponseWriter{
-					ResponseWriter:   w,
-					validator:        v,
-					responseSchema:   responseSchema,
-					statusCode:       200,
+					ResponseWriter: w,
+					validator:      v,
+					responseSchema: responseSchema,
+					statusCode:     200,
 				}
 				next.ServeHTTP(wrapped, r)
 				return
@@ -170,7 +172,7 @@ func (vrw *validatingResponseWriter) Write(data []byte) (int, error) {
 	}
 
 	// Only validate JSON responses
-	contentType := vrw.Header().Get("Content-Type")
+	contentType := vrw.ResponseWriter.Header().Get("Content-Type")
 	if contentType == "application/json" || contentType == "" {
 		vrw.body.Write(data)
 	}

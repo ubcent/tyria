@@ -11,11 +11,11 @@ import (
 
 const (
 	// Argon2 parameters
-	saltLen    = 32
-	keyLen     = 32
-	timeParam  = 1
-	memory     = 64 * 1024 // 64 MB
-	threads    = 4
+	saltLen   = 32
+	keyLen    = 32
+	timeParam = 1
+	memory    = 64 * 1024 // 64 MB
+	threads   = 4
 )
 
 // PasswordConfig holds the argon2id configuration
@@ -41,7 +41,7 @@ func DefaultPasswordConfig() PasswordConfig {
 // HashPassword hashes a password using argon2id
 func HashPassword(password string) (string, error) {
 	config := DefaultPasswordConfig()
-	
+
 	salt := make([]byte, config.SaltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return "", fmt.Errorf("failed to generate salt: %w", err)
@@ -101,12 +101,17 @@ func parseHash(encoded string) (salt, hash []byte, config PasswordConfig, err er
 		return nil, nil, config, fmt.Errorf("invalid hash encoding: %w", err)
 	}
 
+	// Validate lengths to prevent integer overflow
+	if len(hash) > 0xFFFFFFFF || len(salt) > 0xFFFFFFFF {
+		return nil, nil, config, fmt.Errorf("hash or salt length exceeds maximum allowed size")
+	}
+
 	config = PasswordConfig{
 		Time:    time,
 		Memory:  memory,
 		Threads: threads,
-		KeyLen:  uint32(len(hash)),
-		SaltLen: uint32(len(salt)),
+		KeyLen:  uint32(len(hash)), // #nosec G115 - bounds checked above
+		SaltLen: uint32(len(salt)), // #nosec G115 - bounds checked above
 	}
 
 	return salt, hash, config, nil

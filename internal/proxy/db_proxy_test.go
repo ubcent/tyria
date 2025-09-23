@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	_ "modernc.org/sqlite"
 	"github.com/ubcent/edge.link/internal/models"
+	_ "modernc.org/sqlite"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
@@ -83,64 +83,64 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 func TestPathMatching(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
 	tests := []struct {
-		name        string
-		pattern     string
-		requestPath string
-		expectMatch bool
+		name         string
+		pattern      string
+		requestPath  string
+		expectMatch  bool
 		expectParams map[string]string
 	}{
 		{
-			name:        "exact match",
-			pattern:     "/api/users",
-			requestPath: "/api/users",
-			expectMatch: true,
+			name:         "exact match",
+			pattern:      "/api/users",
+			requestPath:  "/api/users",
+			expectMatch:  true,
 			expectParams: map[string]string{},
 		},
 		{
-			name:        "no match different path",
-			pattern:     "/api/users",
-			requestPath: "/api/posts",
-			expectMatch: false,
+			name:         "no match different path",
+			pattern:      "/api/users",
+			requestPath:  "/api/posts",
+			expectMatch:  false,
 			expectParams: map[string]string{},
 		},
 		{
-			name:        "wildcard match",
-			pattern:     "/api/*",
-			requestPath: "/api/users/123",
-			expectMatch: true,
+			name:         "wildcard match",
+			pattern:      "/api/*",
+			requestPath:  "/api/users/123",
+			expectMatch:  true,
 			expectParams: map[string]string{},
 		},
 		{
-			name:        "single parameter",
-			pattern:     "/users/{id}",
-			requestPath: "/users/123",
-			expectMatch: true,
+			name:         "single parameter",
+			pattern:      "/users/{id}",
+			requestPath:  "/users/123",
+			expectMatch:  true,
 			expectParams: map[string]string{"id": "123"},
 		},
 		{
-			name:        "multiple parameters",
-			pattern:     "/users/{userId}/posts/{postId}",
-			requestPath: "/users/123/posts/456",
-			expectMatch: true,
+			name:         "multiple parameters",
+			pattern:      "/users/{userId}/posts/{postId}",
+			requestPath:  "/users/123/posts/456",
+			expectMatch:  true,
 			expectParams: map[string]string{"userId": "123", "postId": "456"},
 		},
 		{
-			name:        "parameter mismatch count",
-			pattern:     "/users/{id}",
-			requestPath: "/users/123/extra",
-			expectMatch: false,
+			name:         "parameter mismatch count",
+			pattern:      "/users/{id}",
+			requestPath:  "/users/123/extra",
+			expectMatch:  false,
 			expectParams: map[string]string{},
 		},
 		{
-			name:        "mixed literal and parameter",
-			pattern:     "/api/v1/users/{id}",
-			requestPath: "/api/v1/users/123",
-			expectMatch: true,
+			name:         "mixed literal and parameter",
+			pattern:      "/api/v1/users/{id}",
+			requestPath:  "/api/v1/users/123",
+			expectMatch:  true,
 			expectParams: map[string]string{"id": "123"},
 		},
 	}
@@ -148,12 +148,12 @@ func TestPathMatching(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			params, matches := service.matchPath(tt.pattern, tt.requestPath)
-			
+
 			if matches != tt.expectMatch {
-				t.Errorf("Expected match %v, got %v for pattern %s and path %s", 
+				t.Errorf("Expected match %v, got %v for pattern %s and path %s",
 					tt.expectMatch, matches, tt.pattern, tt.requestPath)
 			}
-			
+
 			if tt.expectMatch {
 				for key, expectedValue := range tt.expectParams {
 					if actualValue, exists := params[key]; !exists {
@@ -169,7 +169,7 @@ func TestPathMatching(t *testing.T) {
 
 func TestTenantResolution(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
@@ -185,39 +185,39 @@ func TestTenantResolution(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		host        string
+		name         string
+		host         string
 		tenantHeader string
-		expectedID  int
-		expectError bool
+		expectedID   int
+		expectError  bool
 	}{
 		{
-			name:        "resolve from X-Tenant header",
-			host:        "localhost:8080",
+			name:         "resolve from X-Tenant header",
+			host:         "localhost:8080",
 			tenantHeader: "1",
-			expectedID:  1,
-			expectError: false,
+			expectedID:   1,
+			expectError:  false,
 		},
 		{
-			name:        "resolve from custom domain",
-			host:        "example.com",
+			name:         "resolve from custom domain",
+			host:         "example.com",
 			tenantHeader: "",
-			expectedID:  1,
-			expectError: false,
+			expectedID:   1,
+			expectError:  false,
 		},
 		{
-			name:        "no tenant found",
-			host:        "unknown.com",
+			name:         "no tenant found",
+			host:         "unknown.com",
 			tenantHeader: "",
-			expectedID:  0,
-			expectError: false,
+			expectedID:   0,
+			expectError:  false,
 		},
 		{
-			name:        "invalid X-Tenant header",
-			host:        "localhost:8080",
+			name:         "invalid X-Tenant header",
+			host:         "localhost:8080",
 			tenantHeader: "invalid",
-			expectedID:  0,
-			expectError: true,
+			expectedID:   0,
+			expectError:  true,
 		},
 	}
 
@@ -229,15 +229,15 @@ func TestTenantResolution(t *testing.T) {
 			}
 
 			tenantID, err := service.resolveTenant(req)
-			
+
 			if tt.expectError && err == nil {
 				t.Errorf("Expected error but got none")
 			}
-			
+
 			if !tt.expectError && err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			
+
 			if tenantID != tt.expectedID {
 				t.Errorf("Expected tenant ID %d, got %d", tt.expectedID, tenantID)
 			}
@@ -247,7 +247,7 @@ func TestTenantResolution(t *testing.T) {
 
 func TestTenantFromPath(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
@@ -291,21 +291,21 @@ func TestTenantFromPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "http://localhost"+tt.path, nil)
-			
+
 			tenantID, err := service.extractTenantFromPath(req)
-			
+
 			if tt.expectError && err == nil {
 				t.Errorf("Expected error but got none")
 			}
-			
+
 			if !tt.expectError && err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			
+
 			if tenantID != tt.expectedID {
 				t.Errorf("Expected tenant ID %d, got %d", tt.expectedID, tenantID)
 			}
-			
+
 			if !tt.expectError && req.URL.Path != tt.expectedPath {
 				t.Errorf("Expected path %s, got %s", tt.expectedPath, req.URL.Path)
 			}
@@ -315,7 +315,7 @@ func TestTenantFromPath(t *testing.T) {
 
 func TestAuthModeEnforcement(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
@@ -381,11 +381,11 @@ func TestAuthModeEnforcement(t *testing.T) {
 			}
 
 			err := service.enforceAuth(route, req, 1)
-			
+
 			if tt.expectError && err == nil {
 				t.Errorf("Expected error but got none")
 			}
-			
+
 			if !tt.expectError && err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

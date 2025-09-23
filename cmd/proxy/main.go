@@ -1,3 +1,5 @@
+// Package main provides the entry point for the edge.link proxy service.
+// It initializes the server, loads configuration, and handles graceful shutdown.
 package main
 
 import (
@@ -12,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-chi/chi/v5"
+	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ubcent/edge.link/internal/config"
 	"github.com/ubcent/edge.link/internal/db"
@@ -27,7 +29,7 @@ const (
 
 func main() {
 	var (
-		configPath = flag.String("config", defaultConfigPath, "Path to configuration file")
+		configPath  = flag.String("config", defaultConfigPath, "Path to configuration file")
 		showVersion = flag.Bool("version", false, "Show version and exit")
 	)
 	flag.Parse()
@@ -75,7 +77,7 @@ func main() {
 		if err != nil {
 			logger.Warn("Failed to connect to database, running without DB", "error", err)
 		} else {
-			defer database.Close()
+			defer func() { _ = database.Close() }()
 		}
 	}
 
@@ -97,7 +99,7 @@ func main() {
 	// Create proxy service and mount its handler
 	var proxyService *proxy.Service
 	var dbProxyService *proxy.DBService
-	
+
 	if database != nil {
 		// Use database-driven proxy when database is available
 		dbProxyService = proxy.NewDBService(database.DB)
@@ -121,7 +123,7 @@ func main() {
 	var metricsServer *http.Server
 	if cfg.Metrics.Enabled {
 		metricsRouter := chi.NewRouter()
-		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) {
+		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, _ *http.Request) {
 			var stats interface{}
 			if proxyService != nil {
 				stats = proxyService.GetMetrics().GetStats()
@@ -137,10 +139,11 @@ func main() {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		})
-		
+
 		metricsServer = &http.Server{
-			Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),
-			Handler: metricsRouter,
+			Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),
+			Handler:           metricsRouter,
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 	}
 
@@ -213,7 +216,9 @@ func healthHandler(database *db.DB) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(health)
+		if err := json.NewEncoder(w).Encode(health); err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -226,7 +231,9 @@ func versionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(versionInfo)
+	if err := json.NewEncoder(w).Encode(versionInfo); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // printConfig prints the loaded configuration (excluding sensitive data)
@@ -248,6 +255,8 @@ func printConfig(cfg *config.Config) {
 }
 
 // createDefaultConfig creates a default configuration file if none exists
+//
+//nolint:unused // currently unused helper retained for potential CLI feature
 func createDefaultConfig(path string) error {
 	defaultCfg := &config.Config{
 		Server: config.ServerConfig{
@@ -309,5 +318,5 @@ func createDefaultConfig(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }

@@ -119,7 +119,7 @@ export default function OnboardingPage() {
 
             <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                <strong>Step 1 of 2:</strong> We'll generate a unique proxy URL for your domain that you can use immediately.
+                <strong>Step 1 of 2:</strong> We&apos;ll generate a unique proxy URL for your domain that you can use immediately.
               </p>
             </div>
           </div>

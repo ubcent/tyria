@@ -275,7 +275,7 @@ export default function ApiKeysPage() {
 
                   <div className="bg-red-50 border border-red-200 rounded-md p-3">
                     <p className="text-sm text-red-800">
-                      <strong>Important:</strong> This is the only time you'll see the full key. Copy it now and store it securely.
+                      <strong>Important:</strong> This is the only time you&apos;ll see the full key. Copy it now and store it securely.
                     </p>
                   </div>
 

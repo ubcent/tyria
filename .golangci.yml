@@ -1,0 +1,21 @@
+version: "2"
+
+run:
+  timeout: 5m
+  allow-parallel-runners: true
+
+linters:
+  enable:
+    # Default enabled linters
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+  exclusions:
+    rules:
+      # Exclude `staticcheck` SA9003 empty-branch check. Valid for ignoring errors.
+      - linters:
+          - staticcheck
+        text: "SA9003:"

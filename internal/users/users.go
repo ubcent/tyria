@@ -1,3 +1,4 @@
+// Package users provides user management functionality for the edge.link proxy service.
 package users
 
 import (
@@ -72,21 +73,7 @@ func (s *Service) GetByID(ctx context.Context, id int) (*models.User, error) {
 		FROM users
 		WHERE id = $1
 	`
-
-	user := &models.User{}
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
-		&user.ID, &user.TenantID, &user.Email, &user.HashedPassword,
-		&user.Role, &user.CreatedAt, &user.UpdatedAt,
-	)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user not found")
-		}
-		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-
-	return user, nil
+	return s.queryUser(ctx, query, id)
 }
 
 // GetByEmail retrieves a user by email
@@ -96,9 +83,13 @@ func (s *Service) GetByEmail(ctx context.Context, email string) (*models.User, e
 		FROM users
 		WHERE email = $1
 	`
+	return s.queryUser(ctx, query, email)
+}
 
+// queryUser is a helper function to query user by different criteria
+func (s *Service) queryUser(ctx context.Context, query string, args ...interface{}) (*models.User, error) {
 	user := &models.User{}
-	err := s.db.QueryRowContext(ctx, query, email).Scan(
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&user.ID, &user.TenantID, &user.Email, &user.HashedPassword,
 		&user.Role, &user.CreatedAt, &user.UpdatedAt,
 	)
@@ -126,7 +117,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.User
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []*models.User
 	for rows.Next() {
