@@ -16,7 +16,7 @@ This roadmap organizes the incremental prompts and tasks to evolve the product i
 
 ---
 
-### Phase 0: Project overview and TODO map
+### Phase 0: Project overview and TODO map ✅
 1) Project overview read-in + TODO map
 ```
 You are assisting on a SaaS Proxy-as-a-Service for MACH integrations.
@@ -29,7 +29,7 @@ Deliver: A markdown checklist grouped by backend, admin UI, SaaS flows, caching,
 
 ---
 
-### Phase 1: Backend foundation (Go)
+### Phase 1: Backend foundation (Go) ✅
 2) Backend module skeleton: multi-tenant proxy service
 ```
 Create a Go module structure for a multi-tenant proxy service.
@@ -41,7 +41,7 @@ Create a Go module structure for a multi-tenant proxy service.
 Acceptance: App compiles with `go build ./cmd/proxy` and runs `GET /healthz`.
 ```
 
-3) Database schema (PostgreSQL) for SaaS multi-tenancy
+3) Database schema (PostgreSQL) for SaaS multi-tenancy ✅
 ```
 Define SQL migrations (e.g., `migrations/0001_init.sql`) and Go models for:
 - `tenants` (id, name, plan, status)
@@ -54,7 +54,7 @@ Define SQL migrations (e.g., `migrations/0001_init.sql`) and Go models for:
 Use goose or sqlc or gorm. Provide example seed data for a demo tenant.
 ```
 
-4) AuthN/AuthZ for admin API + UI
+4) AuthN/AuthZ for admin API + UI ✅
 ```
 Implement email/password login (simple first), with JWT sessions.
 - Backend: `internal/auth` for password hashing (argon2id), JWT issuance/verification, middleware to load `tenant_id` and `user_id`.
@@ -64,7 +64,7 @@ Implement email/password login (simple first), with JWT sessions.
 Acceptance: Can sign up, confirm email (stub), login, and see tenant dashboard. Unauthorized users redirected.
 ```
 
-5) API key management (backend + UI)
+5) API key management (backend + UI) ✅
 ```
 Backend:
 - Endpoints: `POST /v1/api-keys`, `GET /v1/api-keys`, `DELETE /v1/api-keys/{id}` scoped to tenant. Store only a hash of the key; return plaintext once on create with `prefix.key` format.
@@ -77,7 +77,7 @@ Admin UI (`admin-ui/app/keys/page.tsx`):
 Security: Key prefixes for fast lookup; rotate guidance.
 ```
 
-6) Route configuration CRUD (backend + UI)
+6) Route configuration CRUD (backend + UI) ✅
 ```
 Backend endpoints under `/v1/routes` for CRUD with validation:
 - `name`, `match_path`, `upstream_url` (validate URL), `headers_json` (map), `auth_mode` (none, api_key, basic), `caching_policy_json`, `rate_limit_policy_json`.
@@ -87,7 +87,7 @@ Admin UI (`admin-ui/app/routes/page.tsx`):
 - Show linting/errors for JSON.
 ```
 
-7) Proxy request flow with API key check and routing
+7) Proxy request flow with API key check and routing ✅
 ```
 Implement `internal/proxy` HTTP handler:
 - Resolve tenant from hostname (custom domain) or `X-Tenant` header (for dev).
@@ -99,7 +99,7 @@ Implement `internal/proxy` HTTP handler:
 Expose proxy under `/:tenant/*` for dev and under custom domains in prod (see domain linking prompt).
 ```
 
-8) Edge caching layer with pluggable stores
+8) Edge caching layer with pluggable stores ✅
 ```
 Add `internal/cache` with interface `Get/Set/Delete`. Provide in-memory LRU and Redis implementations. Configurable TTL from route `caching_policy_json` with fields: `enabled`, `ttl_seconds`, `vary_headers`.
 - Add cache key derivation (tenant + route + method + path + relevant headers).
