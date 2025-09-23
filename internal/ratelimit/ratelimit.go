@@ -1,3 +1,5 @@
+// Package ratelimit provides rate limiting functionality for the edge.link proxy service.
+// It implements token bucket algorithms and per-client rate limiting mechanisms.
 package ratelimit
 
 import (

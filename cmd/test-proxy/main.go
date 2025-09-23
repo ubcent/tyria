@@ -1,3 +1,5 @@
+// Package main provides a test proxy service for development and testing purposes.
+// It sets up mock backends and demonstrates the edge.link proxy functionality.
 package main
 
 import (
@@ -202,7 +204,7 @@ func startMockUpstream() {
 		}
 	})
 
-	mux.HandleFunc("/posts", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/posts", func(w http.ResponseWriter, _ *http.Request) {
 		response := []map[string]interface{}{
 			{"id": 1, "title": "Test Post 1", "body": "This is a test post"},
 			{"id": 2, "title": "Test Post 2", "body": "Another test post"},

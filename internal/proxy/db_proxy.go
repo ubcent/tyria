@@ -25,6 +25,15 @@ import (
 	"github.com/ubcent/edge.link/internal/tenant"
 )
 
+// Cache configuration constants
+const (
+	defaultCacheSizeMB    = 100
+	defaultCacheTTL       = 5 * time.Minute
+	defaultCacheCleanup   = 10 * time.Minute
+	httpErrorStatusCode   = 400
+	bytesToMB             = 1024 * 1024
+)
+
 // DBService represents a database-driven proxy service
 type DBService struct {
 	db             *sql.DB
@@ -40,7 +49,7 @@ type DBService struct {
 // NewDBService creates a new database-driven proxy service
 func NewDBService(db *sql.DB) *DBService {
 	// Initialize LRU cache as default
-	cacheInstance := cache.NewLRU(100*1024*1024, 5*time.Minute, 10*time.Minute) // 100MB cache, 5min TTL, 10min cleanup
+	cacheInstance := cache.NewLRU(defaultCacheSizeMB*bytesToMB, defaultCacheTTL, defaultCacheCleanup) // 100MB cache, 5min TTL, 10min cleanup
 
 	return &DBService{
 		db:             db,
@@ -190,7 +199,7 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 		ttl := time.Duration(cachingPolicy.TTLSeconds) * time.Second
 		if ttl == 0 {
-			ttl = 5 * time.Minute // Default TTL
+			ttl = defaultCacheTTL // Default TTL
 		}
 		s.cache.SetWithTTL(cacheKey, responseData, ttl)
 	}

@@ -294,7 +294,7 @@ func (s *Service) proxyRequest(w http.ResponseWriter, r *http.Request, route *co
 
 	// Record metrics
 	s.metrics.IncrementProxiedRequests()
-	s.metrics.RecordRouteMetric(route.Path, cacheHit, time.Since(start), wrapped.statusCode >= 400)
+	s.metrics.RecordRouteMetric(route.Path, cacheHit, time.Since(start), wrapped.statusCode >= httpErrorStatusCode)
 }
 
 // findRoute finds the matching route for a request
@@ -356,7 +356,7 @@ func (crw *cachingResponseWriter) writeToCache() {
 	if crw.route.Cache.Enabled && crw.statusCode >= 200 && crw.statusCode < 300 && crw.buffer.Len() > 0 {
 		ttl := crw.route.Cache.TTL
 		if ttl == 0 {
-			ttl = 5 * time.Minute // Default TTL
+			ttl = defaultCacheTTL // Default TTL
 		}
 		crw.cache.SetWithTTL(crw.cacheKey, crw.buffer.Bytes(), ttl)
 	}

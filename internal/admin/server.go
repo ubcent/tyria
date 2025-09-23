@@ -440,9 +440,9 @@ func (s *Server) getRoute(w http.ResponseWriter, r *http.Request, id int) {
 // handleAPIKeys handles API keys collection endpoints
 func (s *Server) handleAPIKeys(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getAPIKeys(w, r)
-	case "POST":
+	case httpMethodPOST:
 		s.createAPIKey(w, r)
 	}
 }
@@ -457,11 +457,11 @@ func (s *Server) handleAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getAPIKey(w, r, id)
-	case "PUT":
+	case httpMethodPUT:
 		s.updateAPIKey(w, r, id)
-	case "DELETE":
+	case httpMethodDELETE:
 		s.deleteAPIKey(w, r, id)
 	}
 }
@@ -782,9 +782,9 @@ func (s *Server) validateRouteInput(route *models.Route) error {
 // handleV1Routes handles v1 routes collection endpoints with validation
 func (s *Server) handleV1Routes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getV1Routes(w, r)
-	case "POST":
+	case httpMethodPOST:
 		s.createV1Route(w, r)
 	}
 }
@@ -799,11 +799,11 @@ func (s *Server) handleV1Route(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getV1Route(w, r, id)
-	case "PUT":
+	case httpMethodPUT:
 		s.updateV1Route(w, r, id)
-	case "DELETE":
+	case httpMethodDELETE:
 		s.deleteV1Route(w, r, id)
 	}
 }

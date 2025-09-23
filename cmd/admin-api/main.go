@@ -1,3 +1,5 @@
+// Package main provides the entry point for the edge.link admin API service.
+// It initializes the admin server, database connections, and handles graceful shutdown.
 package main
 
 import (
@@ -12,6 +14,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// Database constants
+const (
+	memoryDBURL = "file::memory:?cache=shared"
+)
+
 func main() {
 	var (
 		addr        = flag.String("addr", ":3001", "Admin API server address")
@@ -21,7 +28,7 @@ func main() {
 	flag.Parse()
 
 	if *useSQLite || *databaseURL == "" {
-		*databaseURL = "file::memory:?cache=shared"
+		*databaseURL = memoryDBURL
 		log.Println("Using in-memory SQLite database for testing")
 	}
 
@@ -56,7 +63,7 @@ func main() {
 	log.Println("Admin API server stopped")
 }
 
-func setupSQLiteSchema(server *admin.Server) error {
+func setupSQLiteSchema(_ *admin.Server) error {
 	// We need to access the database connection from the server
 	// For now, let's create a simple schema using SQL statements
 	db, err := sql.Open("sqlite", "file::memory:?cache=shared")

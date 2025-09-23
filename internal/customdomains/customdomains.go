@@ -13,6 +13,11 @@ import (
 	"github.com/ubcent/edge.link/internal/models"
 )
 
+// Constants for token generation
+const (
+	verificationTokenBytes = 24
+)
+
 // Service provides custom domain management functionality
 type Service struct {
 	db *sql.DB
@@ -77,6 +82,10 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.Cust
 		domains = append(domains, domain)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over custom domain rows: %w", err)
+	}
+
 	return domains, nil
 }
 
@@ -120,7 +129,7 @@ func (s *Service) queryCustomDomain(ctx context.Context, query string, args ...i
 
 // generateVerificationToken generates a random verification token
 func (s *Service) generateVerificationToken() (string, error) {
-	bytes := make([]byte, 24)
+	bytes := make([]byte, verificationTokenBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}

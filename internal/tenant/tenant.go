@@ -1,3 +1,5 @@
+// Package tenant provides tenant management functionality for the edge.link proxy service.
+// It handles tenant operations, queries, and database interactions for multi-tenant architecture.
 package tenant
 
 import (
@@ -91,6 +93,10 @@ func (s *Service) List(ctx context.Context, limit, offset int) ([]*Tenant, error
 			return nil, fmt.Errorf("failed to scan tenant: %w", err)
 		}
 		tenants = append(tenants, tenant)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over tenant rows: %w", err)
 	}
 
 	return tenants, nil
