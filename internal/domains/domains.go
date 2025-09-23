@@ -1,3 +1,4 @@
+// Package domains contains domain management logic for custom tenant domains.
 package domains
 
 import (
@@ -85,7 +86,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*Domain, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to get domains for tenant: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var domains []*Domain
 	for rows.Next() {

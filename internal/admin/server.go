@@ -15,7 +15,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 
 	"github.com/ubcent/edge.link/internal/apikeys"
@@ -29,12 +28,6 @@ const (
 	httpMethodPOST   = "POST"
 	httpMethodPUT    = "PUT"
 	httpMethodDELETE = "DELETE"
-)
-
-// Other constants
-const (
-	statusUnhealthy = "unhealthy"
-	statusHealthy   = "healthy"
 )
 
 // ErrorResponse represents a JSON error response
@@ -277,7 +270,7 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var routes []ProxyRoute
 	for rows.Next() {
@@ -301,6 +294,12 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 		route.AuthKeys = []string(authKeys)
 
 		routes = append(routes, route)
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating routes: %v", err)
+		s.writeJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	writeJSON(w, routes)

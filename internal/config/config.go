@@ -1,3 +1,4 @@
+// Package config defines configuration structures and helpers for the proxy and admin services.
 package config
 
 import (
@@ -7,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	//nolint:depguard // YAML is used for configuration file parsing and allowed in this package
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -125,6 +127,7 @@ type FeatureFlagsConfig struct {
 
 // LoadConfig loads configuration from a file
 func LoadConfig(path string) (*Config, error) {
+	// #nosec G304 -- the configuration file path is provided by a trusted source (CLI flag/env)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -146,6 +149,8 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 // setDefaults sets default values for the configuration
+//
+//nolint:gocyclo // The function sets many independent defaults; refactoring would hurt readability.
 func (c *Config) setDefaults() {
 	if c.Server.Host == "" {
 		c.Server.Host = "localhost"

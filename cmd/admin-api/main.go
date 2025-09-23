@@ -37,12 +37,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create admin server: %v", err)
 	}
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	// Setup schema for SQLite if needed
 	if *useSQLite || *databaseURL == "file::memory:?cache=shared" {
 		if err := setupSQLiteSchema(server); err != nil {
-			log.Fatalf("Failed to setup SQLite schema: %v", err)
+			log.Printf("Failed to setup SQLite schema: %v", err)
+			// Close server explicitly since we are about to exit and deferred calls won't run after os.Exit
+			_ = server.Close()
+			os.Exit(1)
 		}
 	}
 
@@ -70,7 +73,7 @@ func setupSQLiteSchema(_ *admin.Server) error {
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	schema := `
 	-- Tenants table for multi-tenant support

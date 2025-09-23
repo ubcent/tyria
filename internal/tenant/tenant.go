@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	//nolint:depguard // Internal models are used intentionally via type alias for backward compatibility
 	"github.com/ubcent/edge.link/internal/models"
 )
 
@@ -80,7 +81,7 @@ func (s *Service) List(ctx context.Context, limit, offset int) ([]*Tenant, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tenants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tenants []*Tenant
 	for rows.Next() {

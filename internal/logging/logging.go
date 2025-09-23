@@ -76,14 +76,14 @@ func New(cfg Config) (*Logger, error) {
 // WithTenant adds tenant context to log entries
 func (l *Logger) WithTenant(tenantID int) *Logger {
 	return &Logger{
-		Logger: l.Logger.With("tenant_id", tenantID),
+		Logger: l.With("tenant_id", tenantID),
 	}
 }
 
 // WithRequest adds request context to log entries
 func (l *Logger) WithRequest(method, path, clientIP string) *Logger {
 	return &Logger{
-		Logger: l.Logger.With(
+		Logger: l.With(
 			"method", method,
 			"path", path,
 			"client_ip", clientIP,
@@ -94,6 +94,6 @@ func (l *Logger) WithRequest(method, path, clientIP string) *Logger {
 // WithRoute adds route context to log entries
 func (l *Logger) WithRoute(routePath string) *Logger {
 	return &Logger{
-		Logger: l.Logger.With("route_path", routePath),
+		Logger: l.With("route_path", routePath),
 	}
 }

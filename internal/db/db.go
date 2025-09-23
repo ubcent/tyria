@@ -1,3 +1,4 @@
+// Package db provides database connection management and helpers.
 package db
 
 import (
@@ -5,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	// Import Postgres driver for its side effects (database/sql registration).
 	_ "github.com/lib/pq"
 	"github.com/ubcent/edge.link/internal/migrations"
 )
@@ -58,7 +60,9 @@ func NewWithMigrations(cfg Config) (*DB, error) {
 
 	// Run migrations
 	if err := migrations.Run(db.DB); err != nil {
-		db.Close()
+		if cerr := db.Close(); cerr != nil {
+			return nil, fmt.Errorf("failed to run migrations: %w; additionally failed to close DB: %v", err, cerr)
+		}
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
@@ -72,5 +76,5 @@ func (db *DB) Close() error {
 
 // Health checks database connectivity
 func (db *DB) Health() error {
-	return db.DB.Ping()
+	return db.Ping()
 }

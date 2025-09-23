@@ -23,7 +23,7 @@ func TestCacheManagement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create test cache
 	testCache := cache.NewLRU(1024*1024, 5*time.Minute, 10*time.Minute)
@@ -73,6 +73,7 @@ func TestCacheManagement(t *testing.T) {
 	})
 }
 
+//nolint:unused // helper for future cache tests
 func setupCacheTestData(t *testing.T, db *sql.DB) {
 	// Insert tenant
 	_, err := db.Exec(`
@@ -100,6 +101,7 @@ func setupCacheTestData(t *testing.T, db *sql.DB) {
 	}
 }
 
+//nolint:unused // helper for future cache tests
 func createTables(t *testing.T, db *sql.DB) {
 	tables := []string{
 		`CREATE TABLE tenants (

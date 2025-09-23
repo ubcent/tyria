@@ -83,7 +83,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 func TestPathMatching(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
@@ -169,7 +169,7 @@ func TestPathMatching(t *testing.T) {
 
 func TestTenantResolution(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
@@ -247,7 +247,7 @@ func TestTenantResolution(t *testing.T) {
 
 func TestTenantFromPath(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 
@@ -315,7 +315,7 @@ func TestTenantFromPath(t *testing.T) {
 
 func TestAuthModeEnforcement(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	service := NewDBService(db)
 

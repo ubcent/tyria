@@ -130,7 +130,7 @@ func (r *RedisCache) Stats() Stats {
 
 // Stop closes the Redis connection
 func (r *RedisCache) Stop() {
-	r.client.Close()
+	_ = r.client.Close()
 }
 
 // parseInfo parses Redis INFO command output into key-value pairs

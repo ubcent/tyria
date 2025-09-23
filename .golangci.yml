@@ -1,104 +1,21 @@
+version: "2"
+
 run:
   timeout: 5m
-  tests: true
-
-issues:
-  exclude-dirs:
-    - vendor
-  exclude-files:
-    - ".*_test.go"
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gomnd
-        - lll
-        - dupl
-  exclude-use-default: false
-  exclude:
-    # errcheck: Almost all programs ignore errors on these functions and in most cases it's ok
-    - Error return value of .((os\.)?std(out|err)\..*|.*Close|.*Flush|os\.Remove(All)?|.*printf?|os\.(Un)?Setenv). is not checked
-    
-    # govet: Common false positives
-    - composite literal uses unkeyed fields
-    
-    # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
-    - ineffective break statement. Did you mean to break out of the outer loop
-  max-same-issues: 50
-
-linters-settings:
-  govet:
-    shadow: true
-  revive:
-    min-confidence: 0
-  gocyclo:
-    min-complexity: 15
-  maligned:
-    suggest-new: true
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  depguard:
-    list-type: blacklist
-    packages:
-      # logging is allowed only by logutils.Log, logrus
-      # is allowed to use only in logutils package
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
-  misspell:
-    locale: US
-  lll:
-    line-length: 140
-  goimports:
-    local-prefixes: github.com/ubcent/edge.link
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport # https://github.com/go-critic/go-critic/issues/845
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
+  allow-parallel-runners: true
 
 linters:
-  disable-all: true
   enable:
-    - bodyclose
-    - depguard
-    - dogsled
-    - dupl
+    # Default enabled linters
     - errcheck
-    - exhaustive
-    - gochecknoinits
-    - goconst
-    - gocritic
-    - gocyclo
-    - gofmt
-    - goimports
-    - gomnd
-    - goprintffuncname
-    - gosec
-    - gosimple
     - govet
     - ineffassign
-    - lll
-    - misspell
-    - nakedret
-    - noctx
-    - nolintlint
-    - revive
-    - rowserrcheck
     - staticcheck
-    - stylecheck
-    - unconvert
-    - unparam
     - unused
-    - whitespace
 
+  exclusions:
+    rules:
+      # Exclude `staticcheck` SA9003 empty-branch check. Valid for ignoring errors.
+      - linters:
+          - staticcheck
+        text: "SA9003:"

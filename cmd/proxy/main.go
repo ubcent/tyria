@@ -25,21 +25,6 @@ import (
 const (
 	defaultConfigPath = "config.yaml"
 	version           = "1.0.0"
-	// Default rate limiting values
-	defaultRateLimit   = 100
-	defaultBurst       = 10
-	defaultRPSLimit    = 1000
-	defaultMetricsPort = 9090
-	defaultTestID      = 2
-	// HTTP method constants
-	httpMethodPOST  = "POST"
-	httpMethodPUT   = "PUT"
-	httpMethodPATCH = "PATCH"
-	// Status constants
-	statusUnhealthy = "unhealthy"
-	statusHealthy   = "healthy"
-	// Database constants
-	memoryDBURL = "file::memory:?cache=shared"
 )
 
 func main() {
@@ -92,7 +77,7 @@ func main() {
 		if err != nil {
 			logger.Warn("Failed to connect to database, running without DB", "error", err)
 		} else {
-			defer database.Close()
+			defer func() { _ = database.Close() }()
 		}
 	}
 
@@ -219,8 +204,8 @@ func healthHandler(database *db.DB) http.HandlerFunc {
 		// Check database connectivity if database is available
 		if database != nil {
 			if err := database.Health(); err != nil {
-				health["status"] = statusUnhealthy
-				health["database"] = statusUnhealthy
+				health["status"] = "unhealthy"
+				health["database"] = "unhealthy"
 				health["error"] = err.Error()
 				w.WriteHeader(http.StatusServiceUnavailable)
 			} else {
@@ -270,6 +255,8 @@ func printConfig(cfg *config.Config) {
 }
 
 // createDefaultConfig creates a default configuration file if none exists
+//
+//nolint:unused // currently unused helper retained for potential CLI feature
 func createDefaultConfig(path string) error {
 	defaultCfg := &config.Config{
 		Server: config.ServerConfig{
@@ -295,8 +282,8 @@ func createDefaultConfig(path string) error {
 				},
 				RateLimit: config.RouteRateLimitConfig{
 					Enabled:   true,
-					Rate:      defaultRateLimit,
-					Burst:     defaultBurst,
+					Rate:      100,
+					Burst:     10,
 					Period:    time.Minute,
 					PerClient: true,
 				},
@@ -310,7 +297,7 @@ func createDefaultConfig(path string) error {
 				Key:         "demo-key-12345",
 				Name:        "demo",
 				Permissions: []string{"proxy.*"},
-				RateLimit:   defaultRPSLimit,
+				RateLimit:   1000,
 				Enabled:     true,
 			},
 		},
@@ -322,7 +309,7 @@ func createDefaultConfig(path string) error {
 		Metrics: config.MetricsConfig{
 			Enabled: true,
 			Path:    "/metrics",
-			Port:    defaultMetricsPort,
+			Port:    9090,
 		},
 	}
 

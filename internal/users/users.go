@@ -117,7 +117,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.User
 	if err != nil {
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []*models.User
 	for rows.Next() {

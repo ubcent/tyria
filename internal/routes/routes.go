@@ -23,7 +23,10 @@ func NewService(db *sql.DB) *Service {
 // Create creates a new route
 func (s *Service) Create(ctx context.Context, route *models.Route) error {
 	query := `
-		INSERT INTO routes (tenant_id, name, match_path, upstream_url, headers_json, auth_mode, caching_policy_json, rate_limit_policy_json, enabled)
+		INSERT INTO routes (
+		    tenant_id, name, match_path, upstream_url, headers_json, auth_mode,
+		    caching_policy_json, rate_limit_policy_json, enabled
+		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id, created_at, updated_at
 	`
@@ -78,7 +81,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.Rout
 	if err != nil {
 		return nil, fmt.Errorf("failed to get routes for tenant: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var routes []*models.Route
 	for rows.Next() {

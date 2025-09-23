@@ -189,7 +189,6 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Failed to write cached response", http.StatusInternalServerError)
 				return
 			}
-			cacheHit = true
 			s.metrics.IncrementCachedRequests()
 			s.metrics.RecordRouteMetric(route.Path, true, time.Since(start), false)
 			return
@@ -321,7 +320,12 @@ type cachingResponseWriter struct {
 	statusCode int
 }
 
-func newCachingResponseWriter(w http.ResponseWriter, route *config.RouteConfig, cacheImpl cache.Interface, cacheKey string) *cachingResponseWriter {
+func newCachingResponseWriter(
+	w http.ResponseWriter,
+	route *config.RouteConfig,
+	cacheImpl cache.Interface,
+	cacheKey string,
+) *cachingResponseWriter {
 	return &cachingResponseWriter{
 		ResponseWriter: w,
 		buffer:         &bytes.Buffer{},
@@ -404,7 +408,7 @@ func (s *Service) GetMetrics() *metrics.Metrics {
 
 func (s *Service) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
 }
 
 func (s *Service) statsHandler(w http.ResponseWriter, r *http.Request) {
@@ -431,7 +435,7 @@ func (s *Service) cacheClearHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.cache.Clear()
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"message": "Cache cleared successfully"}`)
+	_, _ = fmt.Fprintf(w, `{"message": "Cache cleared successfully"}`)
 }
 
 func (s *Service) authKeysHandler(w http.ResponseWriter, r *http.Request) {

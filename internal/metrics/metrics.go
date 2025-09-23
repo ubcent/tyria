@@ -1,3 +1,4 @@
+// Package metrics provides in-memory collection and exposition of proxy metrics.
 package metrics
 
 import (
@@ -225,7 +226,7 @@ func (m *Metrics) Reset() {
 
 // Handler returns an HTTP handler that serves metrics as JSON
 func (m *Metrics) Handler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		stats := m.GetStats()

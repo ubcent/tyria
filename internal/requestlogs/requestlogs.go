@@ -71,7 +71,7 @@ func (s *Service) getRequestLogs(ctx context.Context, query string, args ...inte
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []*models.RequestLog
 	for rows.Next() {
@@ -161,6 +161,8 @@ func (s *Service) CleanupOldLogs(ctx context.Context, olderThan time.Time) (int6
 }
 
 // generateVerificationToken generates a random verification token
+//
+//nolint:unused // not used directly yet; reserved for future email verification flows
 func (s *Service) generateVerificationToken() (string, error) {
 	bytes := make([]byte, 24)
 	if _, err := rand.Read(bytes); err != nil {

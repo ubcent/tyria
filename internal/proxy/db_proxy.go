@@ -27,11 +27,11 @@ import (
 
 // Cache configuration constants
 const (
-	defaultCacheSizeMB    = 100
-	defaultCacheTTL       = 5 * time.Minute
-	defaultCacheCleanup   = 10 * time.Minute
-	httpErrorStatusCode   = 400
-	bytesToMB             = 1024 * 1024
+	defaultCacheSizeMB  = 100
+	defaultCacheTTL     = 5 * time.Minute
+	defaultCacheCleanup = 10 * time.Minute
+	httpErrorStatusCode = 400
+	bytesToMB           = 1024 * 1024
 )
 
 // DBService represents a database-driven proxy service
@@ -196,7 +196,6 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 	if cachingPolicy != nil && cachingPolicy.Enabled && cacheKey != "" &&
 		cache.IsCacheable(r.Method) && responseStatus >= 200 && responseStatus < 300 &&
 		len(responseData) > 0 {
-
 		ttl := time.Duration(cachingPolicy.TTLSeconds) * time.Second
 		if ttl == 0 {
 			ttl = defaultCacheTTL // Default TTL
@@ -480,17 +479,21 @@ func (crt *cachingResponseTracker) Write(data []byte) (int, error) {
 }
 
 // responseTracker tracks response metrics
+//
+//nolint:unused // currently not used; kept for potential extension of metrics tracking
 type responseTracker struct {
 	http.ResponseWriter
 	statusCode   int
 	bytesWritten int64
 }
 
+//nolint:unused // currently not used
 func (rt *responseTracker) WriteHeader(statusCode int) {
 	rt.statusCode = statusCode
 	rt.ResponseWriter.WriteHeader(statusCode)
 }
 
+//nolint:unused // currently not used
 func (rt *responseTracker) Write(data []byte) (int, error) {
 	n, err := rt.ResponseWriter.Write(data)
 	rt.bytesWritten += int64(n)
@@ -576,7 +579,7 @@ func (s *DBService) getClientIP(r *http.Request) string {
 // healthHandler returns health status
 func (s *DBService) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s", "service": "db-proxy"}`, time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, `{"status": "healthy", "timestamp": "%s", "service": "db-proxy"}`, time.Now().Format(time.RFC3339))
 }
 
 // cacheStatsHandler returns cache statistics
@@ -598,5 +601,5 @@ func (s *DBService) cacheClearHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.cache.Clear()
 	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"message": "Cache cleared successfully", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, `{"message": "Cache cleared successfully", "timestamp": "%s"}`, time.Now().Format(time.RFC3339))
 }

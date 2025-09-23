@@ -74,7 +74,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.APIK
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API keys for tenant: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keys []*models.APIKey
 	for rows.Next() {
@@ -111,7 +111,7 @@ func (s *Service) ValidateKey(ctx context.Context, keyValue string) (*models.API
 	if err != nil {
 		return nil, fmt.Errorf("failed to query API keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Check each key with matching prefix
 	for rows.Next() {

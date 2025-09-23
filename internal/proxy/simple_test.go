@@ -16,7 +16,7 @@ func TestSimpleDBProxy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create minimal test cache
 	testCache := cache.NewLRU(1024*1024, 5*60, 10*60)

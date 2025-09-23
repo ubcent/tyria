@@ -67,7 +67,7 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.Cust
 	if err != nil {
 		return nil, fmt.Errorf("failed to get custom domains for tenant: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var domains []*models.CustomDomain
 	for rows.Next() {
@@ -100,6 +100,8 @@ func (s *Service) GetByHostname(ctx context.Context, hostname string) (*models.C
 }
 
 // getByID retrieves a custom domain by ID
+//
+//nolint:unused // used for potential future extensions and kept for completeness
 func (s *Service) getByID(ctx context.Context, id int) (*models.CustomDomain, error) {
 	query := `
 		SELECT id, tenant_id, hostname, verification_token, status, created_at, updated_at
@@ -137,6 +139,8 @@ func (s *Service) generateVerificationToken() (string, error) {
 }
 
 // checkDNSVerification checks if domain has the required TXT record
+//
+//nolint:unused // not used in current flow; kept for future DNS verification feature
 func (s *Service) checkDNSVerification(domain, token string) (bool, error) {
 	// Look for TXT record at _edgelink.domain.com
 	verifyDomain := fmt.Sprintf("_edgelink.%s", domain)
