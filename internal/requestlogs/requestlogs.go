@@ -86,6 +86,10 @@ func (s *Service) getRequestLogs(ctx context.Context, query string, args ...inte
 		logs = append(logs, log)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over request logs: %w", err)
+	}
+
 	return logs, nil
 }
 

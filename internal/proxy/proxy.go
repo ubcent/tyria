@@ -178,7 +178,10 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		if cachedData, found := s.cache.Get(cacheKey); found {
 			w.Header().Set("X-Cache", "HIT")
 			w.Header().Set("Content-Type", "application/json")
-			w.Write(cachedData)
+			if _, err := w.Write(cachedData); err != nil {
+				http.Error(w, "Failed to write cached response", http.StatusInternalServerError)
+				return
+			}
 			cacheHit = true
 			s.metrics.IncrementCachedRequests()
 			s.metrics.RecordRouteMetric(route.Path, true, time.Since(start), false)
@@ -224,10 +227,12 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			// Return validation errors
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"error":             "Request validation failed",
 				"validation_errors": result.Errors,
-			})
+			}); err != nil {
+				http.Error(w, "Failed to encode validation errors", http.StatusInternalServerError)
+			}
 			s.metrics.RecordRouteMetric(route.Path, false, time.Since(start), true)
 			return
 		}

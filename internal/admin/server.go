@@ -30,6 +30,13 @@ type ErrorResponse struct {
 	Code    int    `json:"code"`
 }
 
+// writeJSON is a helper function to encode JSON responses with proper error handling
+func writeJSON(w http.ResponseWriter, data interface{}) {
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, "Failed to encode JSON response", http.StatusInternalServerError)
+	}
+}
+
 // Server represents the admin API server
 type Server struct {
 	db             *sql.DB
@@ -40,7 +47,6 @@ type Server struct {
 
 // writeJSONError writes a JSON formatted error response
 func (s *Server) writeJSONError(w http.ResponseWriter, message string, code int) {
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	errorResp := ErrorResponse{
 		Error:   http.StatusText(code),
@@ -283,8 +289,7 @@ func (s *Server) getRoutes(w http.ResponseWriter, r *http.Request) {
 		routes = append(routes, route)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(routes)
+	writeJSON(w, routes)
 }
 
 // createRoute creates a new route
@@ -322,9 +327,8 @@ func (s *Server) createRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // updateRoute updates an existing route
@@ -364,8 +368,7 @@ func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	route.ID = id
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // deleteRoute deletes a route
@@ -417,8 +420,7 @@ func (s *Server) getRoute(w http.ResponseWriter, r *http.Request, id int) {
 	route.Methods = []string(methods)
 	route.AuthKeys = []string(authKeys)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // handleAPIKeys handles API keys collection endpoints
@@ -473,8 +475,7 @@ func (s *Server) getAPIKeys(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, response)
 }
 
 // createAPIKey creates a new API key
@@ -518,9 +519,8 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: apiKey.CreatedAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, response)
 }
 
 // updateAPIKey updates an existing API key
@@ -553,8 +553,7 @@ func (s *Server) updateAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	key.ID = id
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(key)
+	writeJSON(w, key)
 }
 
 // deleteAPIKey deletes an API key
@@ -600,8 +599,7 @@ func (s *Server) getAPIKey(w http.ResponseWriter, r *http.Request, id int) {
 	// Convert pq.StringArray to []string
 	key.Permissions = []string(permissions)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(key)
+	writeJSON(w, key)
 }
 
 // handleDashboardStats handles dashboard statistics
@@ -628,8 +626,7 @@ func (s *Server) handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 		ActiveAPIKeys:   activeAPIKeys,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	writeJSON(w, stats)
 }
 
 // handleDashboardActivity handles dashboard activity feed
@@ -656,14 +653,12 @@ func (s *Server) handleDashboardActivity(w http.ResponseWriter, r *http.Request)
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(activity)
+	writeJSON(w, activity)
 }
 
 // handleHealth handles health check
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	writeJSON(w, map[string]string{
 		"status":    "healthy",
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
@@ -810,8 +805,7 @@ func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(routes)
+	writeJSON(w, routes)
 }
 
 // createV1Route creates a new route with validation
@@ -840,9 +834,8 @@ func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // updateV1Route updates an existing route with validation
@@ -889,8 +882,7 @@ func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
 
 // deleteV1Route deletes a route
@@ -944,6 +936,5 @@ func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(route)
+	writeJSON(w, route)
 }
