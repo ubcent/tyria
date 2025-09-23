@@ -117,7 +117,7 @@ Implement `internal/ratelimit` with Redis-based token bucket.
 Add admin UI controls to edit policies in route editor.
 ```
 
-10) Structured logging and tracing
+10) Structured logging and tracing ✅
 ```
 Use `zerolog` or `zap`. Add request-scoped logger fields: `tenant_id`, `route_id`, `api_key_prefix`, `request_id`.
 - Add OpenTelemetry tracing (HTTP server + client). Export to OTLP endpoint.
