@@ -14,7 +14,12 @@ func TestRedisLimiter_AllowWithPolicy(t *testing.T) {
 	}
 
 	limiter := NewRedisLimiter(redisConfig)
-	defer limiter.Close()
+	defer func(limiter *RedisLimiter) {
+		err := limiter.Close()
+		if err != nil {
+			t.Errorf("Failed to close Redis connection: %v", err)
+		}
+	}(limiter)
 
 	// Test if Redis is available by trying a simple operation
 	allowed, _ := limiter.AllowWithPolicy("test:connection", 1, 1)
@@ -65,7 +70,12 @@ func TestService_InMemory(t *testing.T) {
 	}
 
 	service := NewService(config)
-	defer service.Close()
+	defer func(service *Service) {
+		err := service.Close()
+		if err != nil {
+			t.Errorf("Failed to close Redis connection: %v", err)
+		}
+	}(service)
 
 	service.Reset()
 

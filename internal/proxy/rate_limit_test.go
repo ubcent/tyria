@@ -17,7 +17,12 @@ func TestDBService_RateLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			t.Errorf("Failed to close test database: %v", err)
+		}
+	}(db)
 
 	// Create rate limiting service with in-memory storage for testing
 	rateLimitConfig := ratelimit.ServiceConfig{
