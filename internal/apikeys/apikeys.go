@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ubcent/edge.link/internal/models"
 	"golang.org/x/crypto/bcrypt"
