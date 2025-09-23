@@ -1,0 +1,334 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  # Go backend services testing
+  go-tests:
+    name: Go Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: edgelink_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    strategy:
+      matrix:
+        go-version: [1.24.0]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: make deps
+
+    - name: Format check
+      run: |
+        make fmt
+        if [ -n "$(git diff --exit-code)" ]; then
+          echo "Code is not formatted. Please run 'make fmt'"
+          exit 1
+        fi
+
+    - name: Lint
+      run: |
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        make lint
+
+    - name: Set up test database
+      env:
+        POSTGRES_URL: postgres://postgres:postgres@localhost:5432/edgelink_test?sslmode=disable
+      run: |
+        # Create test schema
+        PGPASSWORD=postgres psql -h localhost -U postgres -d edgelink_test -f schema.sql
+
+    - name: Run unit tests
+      run: ./test-ci.sh
+
+    - name: Run integration tests with database
+      env:
+        POSTGRES_URL: postgres://postgres:postgres@localhost:5432/edgelink_test?sslmode=disable
+        RUN_INTEGRATION_TESTS: true
+      run: ./test-ci.sh
+
+    - name: Run test coverage
+      env:
+        POSTGRES_URL: postgres://postgres:postgres@localhost:5432/edgelink_test?sslmode=disable
+      run: make test-coverage
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: backend
+        name: go-coverage
+        fail_ci_if_error: false
+
+  # Build Go binaries
+  go-build:
+    name: Go Build
+    runs-on: ubuntu-latest
+    needs: go-tests
+
+    strategy:
+      matrix:
+        go-version: [1.24.0]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Build all services
+      run: make build-all
+
+    - name: Build production binaries
+      run: |
+        make build-prod
+        make build-admin-prod
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: go-binaries
+        path: bin/
+        retention-days: 7
+
+  # Admin UI testing and building
+  admin-ui:
+    name: Admin UI
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./admin-ui
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: admin-ui/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Configure ESLint
+      run: |
+        if [ ! -f .eslintrc.json ]; then
+          echo '{"extends": "next/core-web-vitals"}' > .eslintrc.json
+        fi
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Type check
+      run: npx tsc --noEmit
+
+    - name: Build
+      run: npm run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: admin-ui-build-node-${{ matrix.node-version }}
+        path: admin-ui/.next/
+        retention-days: 7
+
+  # Docker builds
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [go-tests, admin-ui]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build proxy Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: edge-proxy:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build admin-api Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.admin-api
+        push: false
+        tags: admin-api:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build admin-ui Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./admin-ui
+        push: false
+        tags: admin-ui:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Security scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Set up Go for security scan
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.0'
+
+    - name: Run gosec security scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: './...'
+
+  # Integration test with docker-compose
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Start services with docker-compose
+      run: |
+        docker-compose up -d
+        sleep 30  # Wait for services to start
+
+    - name: Run health checks
+      run: |
+        # Check proxy service
+        curl -f http://localhost:8080/health || exit 1
+        
+        # Check admin API
+        curl -f http://localhost:3001/health || exit 1
+        
+        # Check admin UI
+        curl -f http://localhost:3000 || exit 1
+
+    - name: Run integration tests
+      run: |
+        # Run the test architecture script
+        chmod +x test-architecture.sh
+        ./test-architecture.sh
+
+    - name: Stop services
+      if: always()
+      run: docker-compose down -v
+
+  # Final status check
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [go-tests, go-build, admin-ui, docker-build, security, integration-test]
+    if: always()
+
+    steps:
+    - name: Check all jobs status
+      run: |
+        if [[ "${{ needs.go-tests.result }}" != "success" ]]; then
+          echo "Go tests failed"
+          exit 1
+        fi
+        if [[ "${{ needs.go-build.result }}" != "success" ]]; then
+          echo "Go build failed"  
+          exit 1
+        fi
+        if [[ "${{ needs.admin-ui.result }}" != "success" ]]; then
+          echo "Admin UI build failed"
+          exit 1
+        fi
+        if [[ "${{ needs.docker-build.result }}" != "success" ]]; then
+          echo "Docker build failed"
+          exit 1
+        fi
+        if [[ "${{ needs.security.result }}" != "success" ]]; then
+          echo "Security scan failed"
+          exit 1
+        fi
+        if [[ "${{ needs.integration-test.result }}" != "success" ]]; then
+          echo "Integration tests failed"
+          exit 1
+        fi
+        echo "All CI checks passed!"
