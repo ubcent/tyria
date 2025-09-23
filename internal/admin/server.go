@@ -23,6 +23,20 @@ import (
 	"github.com/ubcent/edge.link/internal/routes"
 )
 
+// HTTP method constants
+const (
+	httpMethodGET    = "GET"
+	httpMethodPOST   = "POST"
+	httpMethodPUT    = "PUT"
+	httpMethodDELETE = "DELETE"
+)
+
+// Other constants
+const (
+	statusUnhealthy = "unhealthy"
+	statusHealthy   = "healthy"
+)
+
 // ErrorResponse represents a JSON error response
 type ErrorResponse struct {
 	Error   string `json:"error"`
@@ -219,9 +233,9 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 // handleRoutes handles routes collection endpoints
 func (s *Server) handleRoutes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getRoutes(w, r)
-	case "POST":
+	case httpMethodPOST:
 		s.createRoute(w, r)
 	}
 }
@@ -236,11 +250,11 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case "GET":
+	case httpMethodGET:
 		s.getRoute(w, r, id)
-	case "PUT":
+	case httpMethodPUT:
 		s.updateRoute(w, r, id)
-	case "DELETE":
+	case httpMethodDELETE:
 		s.deleteRoute(w, r, id)
 	}
 }

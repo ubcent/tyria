@@ -19,6 +19,13 @@ import (
 	"github.com/ubcent/edge.link/internal/validation"
 )
 
+// HTTP method constants
+const (
+	httpMethodPOST  = "POST"
+	httpMethodPUT   = "PUT"
+	httpMethodPATCH = "PATCH"
+)
+
 // Service represents the proxy service
 type Service struct {
 	config    *config.Config
@@ -159,7 +166,7 @@ func (s *Service) proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	if route.Cache.Enabled {
 		// Read request body for POST/PUT/PATCH requests to include in cache key
-		if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
+		if r.Method == httpMethodPOST || r.Method == httpMethodPUT || r.Method == httpMethodPATCH {
 			var err error
 			requestBody, err = io.ReadAll(r.Body)
 			if err != nil {
@@ -417,7 +424,7 @@ func (s *Service) cacheStatsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Service) cacheClearHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
+	if r.Method != httpMethodPOST {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}

@@ -1,3 +1,5 @@
+// Package main provides the entry point for the edge.link proxy service.
+// It initializes the server, loads configuration, and handles graceful shutdown.
 package main
 
 import (
@@ -29,6 +31,15 @@ const (
 	defaultRPSLimit    = 1000
 	defaultMetricsPort = 9090
 	defaultTestID      = 2
+	// HTTP method constants
+	httpMethodPOST  = "POST"
+	httpMethodPUT   = "PUT"
+	httpMethodPATCH = "PATCH"
+	// Status constants
+	statusUnhealthy = "unhealthy"
+	statusHealthy   = "healthy"
+	// Database constants
+	memoryDBURL = "file::memory:?cache=shared"
 )
 
 func main() {
@@ -127,7 +138,7 @@ func main() {
 	var metricsServer *http.Server
 	if cfg.Metrics.Enabled {
 		metricsRouter := chi.NewRouter()
-		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, r *http.Request) {
+		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, _ *http.Request) {
 			var stats interface{}
 			if proxyService != nil {
 				stats = proxyService.GetMetrics().GetStats()
@@ -145,8 +156,9 @@ func main() {
 		})
 
 		metricsServer = &http.Server{
-			Addr:    fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),
-			Handler: metricsRouter,
+			Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),
+			Handler:           metricsRouter,
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 	}
 
@@ -207,8 +219,8 @@ func healthHandler(database *db.DB) http.HandlerFunc {
 		// Check database connectivity if database is available
 		if database != nil {
 			if err := database.Health(); err != nil {
-				health["status"] = "unhealthy"
-				health["database"] = "unhealthy"
+				health["status"] = statusUnhealthy
+				health["database"] = statusUnhealthy
 				health["error"] = err.Error()
 				w.WriteHeader(http.StatusServiceUnavailable)
 			} else {
@@ -319,5 +331,5 @@ func createDefaultConfig(path string) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }

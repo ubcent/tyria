@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// HTTP method constants
+const (
+	httpMethodPOST  = "POST"
+	httpMethodPUT   = "PUT"
+	httpMethodPATCH = "PATCH"
+)
+
 // Entry represents a cache entry with expiration
 type Entry struct {
 	Value     []byte
@@ -219,7 +226,7 @@ func GenerateKeyWithBody(method, path, query string, body []byte) string {
 	baseKey := GenerateKey(method, path, query)
 
 	// For POST, PUT, PATCH requests with body, include SHA-256 hash of body
-	if (method == "POST" || method == "PUT" || method == "PATCH") && len(body) > 0 {
+	if (method == httpMethodPOST || method == httpMethodPUT || method == httpMethodPATCH) && len(body) > 0 {
 		hash := sha256.Sum256(body)
 		return baseKey + ":body:" + fmt.Sprintf("%x", hash)
 	}

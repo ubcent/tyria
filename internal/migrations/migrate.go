@@ -1,3 +1,5 @@
+// Package migrations provides database migration functionality for the edge.link proxy service.
+// It handles schema updates and data migrations using the goose migration tool.
 package migrations
 
 import (

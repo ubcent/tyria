@@ -1,3 +1,5 @@
+// Package logging provides centralized logging functionality for the edge.link proxy service.
+// It supports multiple output formats and destinations including file and console output.
 package logging
 
 import (
@@ -45,7 +47,7 @@ func New(cfg Config) (*Logger, error) {
 		output = os.Stderr
 	default:
 		// Assume it's a file path
-		file, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(cfg.Output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 		if err != nil {
 			return nil, err
 		}

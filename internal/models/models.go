@@ -1,3 +1,5 @@
+// Package models defines the data structures used throughout the edge.link proxy service.
+// It includes definitions for users, routes, API keys, request logs, and other core entities.
 package models
 
 import (
