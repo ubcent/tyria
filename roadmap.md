@@ -107,7 +107,7 @@ Add `internal/cache` with interface `Get/Set/Delete`. Provide in-memory LRU and 
 - Update proxy to check cache before upstream, and mark `cache_status` as `hit`/`miss`/`bypass`.
 ```
 
-9) Rate limiting (token bucket) per route and per API key
+9) Rate limiting (token bucket) per route and per API key ✅
 ```
 Implement `internal/ratelimit` with Redis-based token bucket.
 - Policy fields in `rate_limit_policy_json`: `enabled`, `requests_per_minute`, `burst`.

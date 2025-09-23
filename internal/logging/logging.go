@@ -118,14 +118,14 @@ func (l *Logger) WithContext(tenantID int, routeID int, requestID, apiKeyPrefix 
 	event := l.With().
 		Int("tenant_id", tenantID).
 		Str("request_id", requestID)
-	
+
 	if routeID > 0 {
 		event = event.Int("route_id", routeID)
 	}
-	
+
 	if apiKeyPrefix != "" {
 		event = event.Str("api_key_prefix", apiKeyPrefix)
 	}
-	
+
 	return &Logger{Logger: event.Logger()}
 }

@@ -30,11 +30,11 @@ func TestLoggingWithContext(t *testing.T) {
 
 	// Verify all required fields are present
 	expectedFields := map[string]interface{}{
-		"tenant_id":       float64(123), // JSON unmarshals numbers as float64
-		"route_id":        float64(456),
-		"request_id":      "req-123-abc",
-		"api_key_prefix":  "sk_test_",
-		"message":         "test message",
+		"tenant_id":      float64(123), // JSON unmarshals numbers as float64
+		"route_id":       float64(456),
+		"request_id":     "req-123-abc",
+		"api_key_prefix": "sk_test_",
+		"message":        "test message",
 	}
 
 	for field, expectedValue := range expectedFields {
