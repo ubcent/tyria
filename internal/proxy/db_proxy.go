@@ -1,3 +1,5 @@
+// Package proxy provides core proxy functionality for the edge.link service.
+// It handles request routing, caching, rate limiting, and response processing.
 package proxy
 
 import (
@@ -159,7 +161,10 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 				if cachedData, found := s.cache.Get(cacheKey); found {
 					w.Header().Set("X-Cache-Status", string(cache.CacheStatusHit))
 					w.Header().Set("Content-Type", "application/json")
-					w.Write(cachedData)
+					if _, err := w.Write(cachedData); err != nil {
+						http.Error(w, "Failed to write cached response", http.StatusInternalServerError)
+						return
+					}
 					cacheStatus = cache.CacheStatusHit
 
 					// Log cache hit

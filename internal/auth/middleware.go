@@ -89,7 +89,9 @@ func (m *AuthMiddleware) writeJSONError(w http.ResponseWriter, message string, c
 		Message: message,
 		Code:    code,
 	}
-	json.NewEncoder(w).Encode(errorResp)
+	if err := json.NewEncoder(w).Encode(errorResp); err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
 }
 
 // NewAuthMiddleware creates a new auth middleware

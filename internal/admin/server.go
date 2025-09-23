@@ -1,3 +1,5 @@
+// Package admin provides administrative server functionality for the edge.link proxy service.
+// It includes authentication, user management, route configuration, and API key management.
 package admin
 
 import (

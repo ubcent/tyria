@@ -23,6 +23,12 @@ import (
 const (
 	defaultConfigPath = "config.yaml"
 	version           = "1.0.0"
+	// Default rate limiting values
+	defaultRateLimit  = 100
+	defaultBurst      = 10
+	defaultRPSLimit   = 1000
+	defaultMetricsPort = 9090
+	defaultTestID      = 2
 )
 
 func main() {
@@ -277,8 +283,8 @@ func createDefaultConfig(path string) error {
 				},
 				RateLimit: config.RouteRateLimitConfig{
 					Enabled:   true,
-					Rate:      100,
-					Burst:     10,
+					Rate:      defaultRateLimit,
+					Burst:     defaultBurst,
 					Period:    time.Minute,
 					PerClient: true,
 				},
@@ -292,7 +298,7 @@ func createDefaultConfig(path string) error {
 				Key:         "demo-key-12345",
 				Name:        "demo",
 				Permissions: []string{"proxy.*"},
-				RateLimit:   1000,
+				RateLimit:   defaultRPSLimit,
 				Enabled:     true,
 			},
 		},
@@ -304,7 +310,7 @@ func createDefaultConfig(path string) error {
 		Metrics: config.MetricsConfig{
 			Enabled: true,
 			Path:    "/metrics",
-			Port:    9090,
+			Port:    defaultMetricsPort,
 		},
 	}
 

@@ -1,3 +1,4 @@
+// Package routes provides route configuration and management functionality for the edge.link proxy service.
 package routes
 
 import (
@@ -91,6 +92,10 @@ func (s *Service) GetByTenant(ctx context.Context, tenantID int) ([]*models.Rout
 			return nil, fmt.Errorf("failed to scan route: %w", err)
 		}
 		routes = append(routes, route)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over routes: %w", err)
 	}
 
 	return routes, nil

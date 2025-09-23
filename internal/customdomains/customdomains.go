@@ -1,3 +1,4 @@
+// Package customdomains provides custom domain management functionality for the edge.link proxy service.
 package customdomains
 
 import (
@@ -86,52 +87,7 @@ func (s *Service) GetByHostname(ctx context.Context, hostname string) (*models.C
 		FROM custom_domains
 		WHERE hostname = $1
 	`
-
-	domain := &models.CustomDomain{}
-	err := s.db.QueryRowContext(ctx, query, hostname).Scan(
-		&domain.ID, &domain.TenantID, &domain.Hostname, &domain.VerificationToken,
-		&domain.Status, &domain.CreatedAt, &domain.UpdatedAt,
-	)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("custom domain not found")
-		}
-		return nil, fmt.Errorf("failed to get custom domain: %w", err)
-	}
-
-	return domain, nil
-}
-
-// VerifyDomain verifies domain ownership via DNS TXT record
-func (s *Service) VerifyDomain(ctx context.Context, domainID int) error {
-	// Get domain record
-	domain, err := s.getByID(ctx, domainID)
-	if err != nil {
-		return err
-	}
-
-	// Check DNS TXT record for verification token
-	verified, err := s.checkDNSVerification(domain.Hostname, domain.VerificationToken)
-	if err != nil {
-		return fmt.Errorf("failed to verify domain: %w", err)
-	}
-
-	var newStatus string
-	if verified {
-		newStatus = "verified"
-	} else {
-		newStatus = "failed"
-	}
-
-	// Update domain status
-	query := `UPDATE custom_domains SET status = $1, updated_at = NOW() WHERE id = $2`
-	_, err = s.db.ExecContext(ctx, query, newStatus, domainID)
-	if err != nil {
-		return fmt.Errorf("failed to update domain verification status: %w", err)
-	}
-
-	return nil
+	return s.queryCustomDomain(ctx, query, hostname)
 }
 
 // getByID retrieves a custom domain by ID
@@ -141,9 +97,13 @@ func (s *Service) getByID(ctx context.Context, id int) (*models.CustomDomain, er
 		FROM custom_domains
 		WHERE id = $1
 	`
+	return s.queryCustomDomain(ctx, query, id)
+}
 
+// queryCustomDomain is a helper function to query custom domain by different criteria
+func (s *Service) queryCustomDomain(ctx context.Context, query string, args ...interface{}) (*models.CustomDomain, error) {
 	domain := &models.CustomDomain{}
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
+	err := s.db.QueryRowContext(ctx, query, args...).Scan(
 		&domain.ID, &domain.TenantID, &domain.Hostname, &domain.VerificationToken,
 		&domain.Status, &domain.CreatedAt, &domain.UpdatedAt,
 	)

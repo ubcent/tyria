@@ -126,10 +126,12 @@ func (v *Validator) Middleware(requestSchema, responseSchema string) func(http.H
 				if !result.Valid {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusBadRequest)
-					json.NewEncoder(w).Encode(map[string]interface{}{
+					if err := json.NewEncoder(w).Encode(map[string]interface{}{
 						"error":             "Request validation failed",
 						"validation_errors": result.Errors,
-					})
+					}); err != nil {
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
+					}
 					return
 				}
 

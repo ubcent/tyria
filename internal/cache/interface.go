@@ -1,3 +1,5 @@
+// Package cache provides caching functionality for the edge.link proxy service.
+// It includes in-memory LRU cache and Redis cache implementations.
 package cache
 
 import (
