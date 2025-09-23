@@ -28,12 +28,12 @@ const (
 
 // Service represents the proxy service
 type Service struct {
-	config      *config.Config
-	cache       cache.Interface
-	auth        *auth.Manager
-	limiter     *ratelimit.Service
-	metrics     *metrics.Metrics
-	validator   *validation.Validator
+	config    *config.Config
+	cache     cache.Interface
+	auth      *auth.Manager
+	limiter   *ratelimit.Service
+	metrics   *metrics.Metrics
+	validator *validation.Validator
 }
 
 // New creates a new proxy service

@@ -12,14 +12,14 @@ func TestRedisLimiter_AllowWithPolicy(t *testing.T) {
 		Password: "",
 		DB:       0,
 	}
-	
+
 	limiter := NewRedisLimiter(redisConfig)
 	defer limiter.Close()
-	
+
 	// Test if Redis is available by trying a simple operation
 	allowed, _ := limiter.AllowWithPolicy("test:connection", 1, 1)
 	_ = allowed // We just want to test the connection
-	
+
 	// If we get here without panic, Redis is working
 	// Otherwise, skip the test
 	t.Skip("Redis tests require a running Redis server")
@@ -63,12 +63,12 @@ func TestService_InMemory(t *testing.T) {
 			CleanupPeriod: time.Minute,
 		},
 	}
-	
+
 	service := NewService(config)
 	defer service.Close()
-	
+
 	service.Reset()
-	
+
 	// Test basic functionality
 	key := "test:service:memory"
 	allowed, retryAfter := service.AllowWithPolicy(key, 60, 2)

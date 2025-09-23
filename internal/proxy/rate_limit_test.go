@@ -23,8 +23,8 @@ func TestDBService_RateLimit(t *testing.T) {
 	rateLimitConfig := ratelimit.ServiceConfig{
 		UseRedis: false,
 		InMemoryConfig: ratelimit.Config{
-			MaxTokens:     5,  // Small burst for testing
-			RefillRate:    2,  // 2 tokens per period
+			MaxTokens:     5, // Small burst for testing
+			RefillRate:    2, // 2 tokens per period
 			RefillPeriod:  time.Second,
 			CleanupPeriod: time.Minute,
 		},
@@ -130,9 +130,9 @@ func TestDBService_ExtractAPIKey(t *testing.T) {
 	service := NewDBService(nil) // No DB needed for this test
 
 	tests := []struct {
-		name        string
+		name         string
 		setupRequest func() *http.Request
-		expected    string
+		expected     string
 	}{
 		{
 			name: "Bearer token in Authorization header",

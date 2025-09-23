@@ -128,7 +128,7 @@ func (r *RedisLimiter) AllowN(key string, n int) bool {
 // Stats returns basic statistics (simplified for Redis implementation)
 func (r *RedisLimiter) Stats() Stats {
 	ctx := context.Background()
-	
+
 	// Count keys with our pattern
 	keys, err := r.client.Keys(ctx, "*:bucket:*").Result()
 	if err != nil {
@@ -141,7 +141,7 @@ func (r *RedisLimiter) Stats() Stats {
 		if err != nil {
 			continue
 		}
-		
+
 		tokenCount, _ := strconv.Atoi(tokens)
 		buckets[key] = BucketStats{
 			Tokens:    tokenCount,
@@ -158,23 +158,23 @@ func (r *RedisLimiter) Stats() Stats {
 // Reset removes all rate limit buckets
 func (r *RedisLimiter) Reset() {
 	ctx := context.Background()
-	
+
 	// Delete all bucket keys
 	keys, err := r.client.Keys(ctx, "*:bucket:*").Result()
 	if err != nil {
 		return
 	}
-	
+
 	if len(keys) > 0 {
 		r.client.Del(ctx, keys...)
 	}
-	
+
 	// Delete all last_refill keys
 	keys, err = r.client.Keys(ctx, "*:last_refill").Result()
 	if err != nil {
 		return
 	}
-	
+
 	if len(keys) > 0 {
 		r.client.Del(ctx, keys...)
 	}

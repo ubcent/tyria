@@ -146,7 +146,7 @@ func (l *Limiter) AllowN(key string, n int) bool {
 func (l *Limiter) AllowWithPolicy(key string, requestsPerMinute, burst int) (allowed bool, retryAfter int) {
 	// Create a custom bucket for this specific policy
 	policyKey := fmt.Sprintf("%s:policy:%d:%d", key, requestsPerMinute, burst)
-	
+
 	l.mu.RLock()
 	bucket, exists := l.buckets[policyKey]
 	l.mu.RUnlock()
@@ -174,7 +174,7 @@ func (l *Limiter) AllowWithPolicy(key string, requestsPerMinute, burst int) (all
 	if retryAfterSeconds < 1 {
 		retryAfterSeconds = 1
 	}
-	
+
 	return false, retryAfterSeconds
 }
 

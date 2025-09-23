@@ -7,21 +7,21 @@ type Service struct {
 
 // ServiceConfig holds configuration for the rate limiting service
 type ServiceConfig struct {
-	UseRedis      bool
-	RedisConfig   RedisConfig
+	UseRedis       bool
+	RedisConfig    RedisConfig
 	InMemoryConfig Config
 }
 
 // NewService creates a new rate limiting service
 func NewService(config ServiceConfig) *Service {
 	var limiter PolicyLimiter
-	
+
 	if config.UseRedis {
 		limiter = NewRedisLimiter(config.RedisConfig)
 	} else {
 		limiter = NewLimiter(config.InMemoryConfig)
 	}
-	
+
 	return &Service{
 		limiter: limiter,
 	}

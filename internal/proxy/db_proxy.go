@@ -204,12 +204,12 @@ func (s *DBService) dbProxyHandler(w http.ResponseWriter, r *http.Request) {
 	if err := s.enforceRateLimit(route, r, tenantID); err != nil {
 		status := http.StatusTooManyRequests
 		retryAfter := ""
-		
+
 		// Extract retry-after from error if available
 		if rateLimitErr, ok := err.(*RateLimitError); ok {
 			retryAfter = strconv.Itoa(rateLimitErr.RetryAfter)
 		}
-		
+
 		w.Header().Set("Retry-After", retryAfter)
 		http.Error(w, err.Error(), status)
 		s.logRequest(tenantID, &route.ID, r, start, status, 0, 0, string(cache.CacheStatusMiss))
@@ -667,14 +667,14 @@ func (s *DBService) enforceRateLimit(route *models.Route, r *http.Request, tenan
 
 	// Generate rate limit key for tenant+route
 	tenantRouteKey := ratelimit.GenerateTenantRouteKey(tenantID, route.MatchPath)
-	
+
 	// Check tenant+route rate limit
 	allowed, retryAfter := s.limiter.AllowWithPolicy(
 		tenantRouteKey,
 		rateLimitPolicy.RequestsPerMinute,
 		rateLimitPolicy.Burst,
 	)
-	
+
 	if !allowed {
 		return &RateLimitError{
 			Message:    fmt.Sprintf("Rate limit exceeded for tenant %d on route %s", tenantID, route.MatchPath),
@@ -693,9 +693,9 @@ func (s *DBService) enforceRateLimit(route *models.Route, r *http.Request, tenan
 			if keyPrefix == "" && len(apiKey) > 8 {
 				keyPrefix = apiKey[:8] // Use first 8 chars as fallback prefix
 			}
-			
+
 			apiKeyRateLimitKey := ratelimit.GenerateAPIKeyKey(keyPrefix)
-			
+
 			// Use the same policy as the route for API key rate limiting
 			// In a more advanced implementation, API keys could have their own policies
 			allowed, retryAfter := s.limiter.AllowWithPolicy(
@@ -703,7 +703,7 @@ func (s *DBService) enforceRateLimit(route *models.Route, r *http.Request, tenan
 				rateLimitPolicy.RequestsPerMinute,
 				rateLimitPolicy.Burst,
 			)
-			
+
 			if !allowed {
 				return &RateLimitError{
 					Message:    fmt.Sprintf("Rate limit exceeded for API key %s", keyPrefix),
@@ -724,17 +724,17 @@ func (s *DBService) extractAPIKey(r *http.Request) string {
 			return strings.TrimPrefix(auth, "Bearer ")
 		}
 	}
-	
+
 	// Check X-API-Key header
 	if apiKey := r.Header.Get("X-API-Key"); apiKey != "" {
 		return apiKey
 	}
-	
+
 	// Check api_key query parameter
 	if apiKey := r.URL.Query().Get("api_key"); apiKey != "" {
 		return apiKey
 	}
-	
+
 	return ""
 }
 
