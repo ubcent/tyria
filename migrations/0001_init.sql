@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS routes (
   match_path VARCHAR(255) NOT NULL,
   upstream_url VARCHAR(500) NOT NULL,
   headers_json JSONB DEFAULT '{}',
-  auth_mode VARCHAR(50) DEFAULT 'none' CHECK (auth_mode IN ('none', 'api_key', 'bearer')),
+  auth_mode VARCHAR(50) DEFAULT 'none' CHECK (auth_mode IN ('none', 'api_key', 'basic')),
   caching_policy_json JSONB DEFAULT '{"enabled": false, "ttl_seconds": 300}',
   rate_limit_policy_json JSONB DEFAULT '{"enabled": false, "requests_per_minute": 100}',
   enabled BOOLEAN DEFAULT true,

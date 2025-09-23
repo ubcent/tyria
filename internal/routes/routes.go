@@ -57,10 +57,7 @@ func (s *Service) GetByID(ctx context.Context, id int) (*models.Route, error) {
 	)
 	
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("route not found")
-		}
-		return nil, fmt.Errorf("failed to get route: %w", err)
+		return nil, err
 	}
 	
 	return route, nil

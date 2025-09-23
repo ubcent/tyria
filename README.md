@@ -39,11 +39,44 @@ npm install
 npm run dev
 ```
 
+**🎮 Demo Access:**
+
+Once the services are running, you can immediately test the system using these pre-configured demo credentials:
+
+**Admin Dashboard Access:**
+1. Open http://localhost:3000 in your browser
+2. Login with:
+   - **Email:** `admin@example.com`
+   - **Password:** `admin123`
+
+**API Testing:**
+```bash
+# Test with demo API key
+curl -H "Authorization: Bearer demo-key-12345" \
+     http://localhost:8080/api/secure/status
+
+# Test with admin API key (higher rate limits)
+curl -H "Authorization: Bearer admin-key-67890" \
+     http://localhost:8080/api/secure/get
+```
+
+> ⚠️ **Security Note**: These are default demo credentials for development/testing only. Change them in production environments.
+
 **Access Points:**
 - **Admin UI**: http://localhost:3000 (Next.js frontend)
 - **Admin API**: http://localhost:3001 (Go backend)
 - **Proxy Service**: http://localhost:8080 (Main proxy)
 - **Metrics**: http://localhost:9090 (Proxy metrics)
+
+**Demo Credentials:**
+- **Admin Login**: 
+  - Email: `admin@example.com`
+  - Password: `admin123`
+- **API Keys**:
+  - Demo Client: `demo-key-12345` (permissions: proxy.*)
+  - Admin Client: `admin-key-67890` (permissions: proxy.*, admin.*)
+
+> ⚠️ **Security Note**: These are default demo credentials for development/testing only. Change them in production environments.
 
 ## 🚀 Features
 

@@ -28,6 +28,20 @@ api.interceptors.response.use(
 );
 
 // Types
+export interface Route {
+  id: number;
+  name: string;
+  match_path: string;
+  upstream_url: string;
+  headers_json: Record<string, any>;
+  auth_mode: 'none' | 'api_key' | 'basic';
+  caching_policy_json: Record<string, any>;
+  rate_limit_policy_json: Record<string, any>;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ProxyRoute {
   id: number;
   path: string;
@@ -86,8 +100,35 @@ export interface Activity {
   type: 'success' | 'warning' | 'error';
 }
 
-// Routes API
+// Routes API (using new v1 endpoints)
 export const routesApi = {
+  getAll: async (): Promise<Route[]> => {
+    const response = await api.get('/api/v1/routes');
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Route> => {
+    const response = await api.get(`/api/v1/routes/${id}`);
+    return response.data;
+  },
+
+  create: async (route: Omit<Route, 'id' | 'created_at' | 'updated_at'>): Promise<Route> => {
+    const response = await api.post('/api/v1/routes', route);
+    return response.data;
+  },
+
+  update: async (id: number, route: Partial<Route>): Promise<Route> => {
+    const response = await api.put(`/api/v1/routes/${id}`, route);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api/v1/routes/${id}`);
+  },
+};
+
+// Legacy Routes API (for backward compatibility)
+export const legacyRoutesApi = {
   getAll: async (): Promise<ProxyRoute[]> => {
     const response = await api.get('/api/routes');
     return response.data;
