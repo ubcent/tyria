@@ -4,115 +4,112 @@
 CREATE TABLE IF NOT EXISTS tenants (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  domain VARCHAR(255) UNIQUE,
-  plan VARCHAR(50) DEFAULT 'free',
-  enabled BOOLEAN DEFAULT true,
+  plan VARCHAR(50) DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
+  status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'canceled')),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Domains table for domain linking
-CREATE TABLE IF NOT EXISTS domains (
-  id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
-  domain VARCHAR(255) NOT NULL,
-  proxy_url VARCHAR(500) NOT NULL,
-  verified BOOLEAN DEFAULT false,
-  verify_token VARCHAR(255) NOT NULL,
-  ssl_enabled BOOLEAN DEFAULT false,
-  ssl_cert_path VARCHAR(500),
-  ssl_key_path VARCHAR(500),
-  enabled BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(tenant_id, domain)
 );
 
 -- Users table for authentication (optional for future use)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  role VARCHAR(50) DEFAULT 'admin',
+  hashed_password VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'viewer' CHECK (role IN ('owner', 'admin', 'viewer')),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Proxy routes configuration
-CREATE TABLE IF NOT EXISTS proxy_routes (
+CREATE TABLE IF NOT EXISTS routes (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
-  path VARCHAR(255) NOT NULL,
-  target VARCHAR(500) NOT NULL,
-  methods TEXT[] DEFAULT '{"GET"}',
-  cache_enabled BOOLEAN DEFAULT false,
-  cache_ttl INTEGER DEFAULT 300, -- seconds
-  rate_limit_enabled BOOLEAN DEFAULT false,
-  rate_limit_rate INTEGER DEFAULT 100,
-  rate_limit_burst INTEGER DEFAULT 10,
-  rate_limit_period INTEGER DEFAULT 60, -- seconds
-  rate_limit_per_client BOOLEAN DEFAULT true,
-  auth_required BOOLEAN DEFAULT false,
-  auth_keys TEXT[] DEFAULT '{}',
-  validation_enabled BOOLEAN DEFAULT false,
-  validation_request_schema TEXT,
-  validation_response_schema TEXT,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  match_path VARCHAR(255) NOT NULL,
+  upstream_url VARCHAR(500) NOT NULL,
+  headers_json JSONB DEFAULT '{}',
+  auth_mode VARCHAR(50) DEFAULT 'none' CHECK (auth_mode IN ('none', 'api_key', 'bearer')),
+  caching_policy_json JSONB DEFAULT '{"enabled": false, "ttl_seconds": 300}',
+  rate_limit_policy_json JSONB DEFAULT '{"enabled": false, "requests_per_minute": 100}',
   enabled BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(tenant_id, match_path)
 );
 
 -- API keys management
 CREATE TABLE IF NOT EXISTS api_keys (
   id SERIAL PRIMARY KEY,
-  tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
-  key_value VARCHAR(255) UNIQUE NOT NULL,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   name VARCHAR(255) NOT NULL,
-  permissions TEXT[] DEFAULT '{}',
-  rate_limit INTEGER DEFAULT 1000,
-  enabled BOOLEAN DEFAULT true,
-  expires_at TIMESTAMP NULL,
+  prefix VARCHAR(20) NOT NULL,
+  hash VARCHAR(255) NOT NULL,
+  last_used_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(tenant_id, name)
+);
+
+-- Custom domains for tenant branding
+CREATE TABLE IF NOT EXISTS custom_domains (
+  id SERIAL PRIMARY KEY,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  hostname VARCHAR(255) NOT NULL UNIQUE,
+  verification_token VARCHAR(255) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'failed')),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Metrics and logs (simplified for MVP)
-CREATE TABLE IF NOT EXISTS request_logs (
+-- Request logs for analytics and monitoring
+CREATE TABLE IF NOT EXISTS requests_log (
   id SERIAL PRIMARY KEY,
-  route_path VARCHAR(255),
-  method VARCHAR(10),
-  status_code INTEGER,
-  response_time_ms INTEGER,
-  client_ip VARCHAR(45),
-  api_key_used VARCHAR(255),
-  cache_hit BOOLEAN DEFAULT false,
+  tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  route_id INTEGER REFERENCES routes(id) ON DELETE SET NULL,
+  status_code INTEGER NOT NULL,
+  latency_ms INTEGER NOT NULL,
+  cache_status VARCHAR(20) DEFAULT 'miss' CHECK (cache_status IN ('hit', 'miss', 'bypass')),
+  bytes_in INTEGER DEFAULT 0,
+  bytes_out INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_proxy_routes_path ON proxy_routes(path);
-CREATE INDEX IF NOT EXISTS idx_api_keys_value ON api_keys(key_value);
-CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at);
-CREATE INDEX IF NOT EXISTS idx_request_logs_route_path ON request_logs(route_path);
+CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_api_keys_tenant_id ON api_keys(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_prefix ON api_keys(prefix);
+CREATE INDEX IF NOT EXISTS idx_routes_tenant_id ON routes(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_routes_match_path ON routes(match_path);
+CREATE INDEX IF NOT EXISTS idx_custom_domains_tenant_id ON custom_domains(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_custom_domains_hostname ON custom_domains(hostname);
+CREATE INDEX IF NOT EXISTS idx_requests_log_tenant_id ON requests_log(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_requests_log_route_id ON requests_log(route_id);
+CREATE INDEX IF NOT EXISTS idx_requests_log_created_at ON requests_log(created_at);
+
+-- Insert default tenant
+INSERT INTO tenants (name, plan, status) 
+VALUES ('Demo Company', 'free', 'active')
+ON CONFLICT DO NOTHING;
 
 -- Insert default admin user (password: admin123)
-INSERT INTO users (email, password_hash, name, role) 
-VALUES ('admin@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin User', 'admin')
+-- First create the user with a reference to tenant ID 1
+INSERT INTO users (tenant_id, email, hashed_password, role) 
+VALUES (1, 'admin@example.com', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- Insert sample route configurations
-INSERT INTO proxy_routes (path, target, methods, cache_enabled, cache_ttl, rate_limit_enabled, rate_limit_rate)
+INSERT INTO routes (tenant_id, name, match_path, upstream_url, auth_mode, enabled)
 VALUES 
-  ('/api/v1/posts', 'https://jsonplaceholder.typicode.com', '{"GET","POST"}', true, 300, true, 100),
-  ('/api/secure/', 'https://httpbin.org', '{"GET","POST","PUT","DELETE"}', true, 120, true, 50)
-ON CONFLICT DO NOTHING;
+  (1, 'Posts API', '/api/v1/posts', 'https://jsonplaceholder.typicode.com', 'none', true),
+  (1, 'Secure API', '/api/secure/', 'https://httpbin.org', 'api_key', true)
+ON CONFLICT (tenant_id, match_path) DO NOTHING;
 
 -- Insert sample API keys
-INSERT INTO api_keys (key_value, name, permissions, rate_limit)
+INSERT INTO api_keys (tenant_id, name, prefix, hash)
 VALUES 
-  ('demo-key-12345', 'demo-client', '{"proxy.*"}', 1000),
-  ('admin-key-67890', 'admin-client', '{"proxy.*","admin.*"}', 5000)
-ON CONFLICT (key_value) DO NOTHING;
+  (1, 'demo-client', 'demo', '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'),
+  (1, 'admin-client', 'admin', 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f')
+ON CONFLICT (tenant_id, name) DO NOTHING;
