@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	
 	"github.com/ubcent/edge.link/internal/apikeys"
 	"github.com/ubcent/edge.link/internal/models"
+	"github.com/ubcent/edge.link/internal/routes"
 )
 
 // Server represents the admin API server
@@ -24,6 +26,7 @@ type Server struct {
 	db            *sql.DB
 	router        *mux.Router
 	apiKeysService *apikeys.Service
+	routesService *routes.Service
 }
 
 // ProxyRoute represents a proxy route configuration
@@ -108,6 +111,7 @@ func NewServer(databaseURL string) (*Server, error) {
 		db:             db,
 		router:         mux.NewRouter(),
 		apiKeysService: apikeys.NewService(db),
+		routesService:  routes.NewService(db),
 	}
 
 	server.setupRoutes()
@@ -142,6 +146,10 @@ func (s *Server) setupRoutes() {
 	v1 := api.PathPrefix("/v1").Subrouter()
 	v1.HandleFunc("/api-keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	v1.HandleFunc("/api-keys/{id}", s.handleAPIKey).Methods("DELETE", "OPTIONS")
+	
+	// Routes management - v1 endpoints with validation
+	v1.HandleFunc("/routes", s.handleV1Routes).Methods("GET", "POST", "OPTIONS")
+	v1.HandleFunc("/routes/{id}", s.handleV1Route).Methods("GET", "PUT", "DELETE", "OPTIONS")
 	
 	// Legacy API Keys management (for backward compatibility)
 	api.HandleFunc("/keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
@@ -643,4 +651,272 @@ func (s *Server) Start(addr string) error {
 // Close closes the database connection
 func (s *Server) Close() error {
 	return s.db.Close()
+}
+
+// validateURL validates if a string is a valid URL
+func validateURL(urlStr string) error {
+	if urlStr == "" {
+		return fmt.Errorf("URL cannot be empty")
+	}
+	
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+	
+	if parsedURL.Scheme == "" {
+		return fmt.Errorf("URL must include a scheme (http:// or https://)")
+	}
+	
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be http or https")
+	}
+	
+	if parsedURL.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+	
+	return nil
+}
+
+// validateAuthMode validates the auth_mode field
+func validateAuthMode(mode string) error {
+	validModes := []string{"none", "api_key", "basic"}
+	for _, valid := range validModes {
+		if mode == valid {
+			return nil
+		}
+	}
+	return fmt.Errorf("auth_mode must be one of: %s", strings.Join(validModes, ", "))
+}
+
+// validateJSON validates that a string contains valid JSON
+func validateJSON(jsonStr string) error {
+	if jsonStr == "" {
+		return nil // Empty JSON is allowed
+	}
+	
+	var temp interface{}
+	if err := json.Unmarshal([]byte(jsonStr), &temp); err != nil {
+		return fmt.Errorf("invalid JSON format: %w", err)
+	}
+	return nil
+}
+
+// validateRouteInput validates the input for creating/updating routes
+func (s *Server) validateRouteInput(route *models.Route) error {
+	if route.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	
+	if route.MatchPath == "" {
+		return fmt.Errorf("match_path is required")
+	}
+	
+	if err := validateURL(route.UpstreamURL); err != nil {
+		return fmt.Errorf("upstream_url validation failed: %w", err)
+	}
+	
+	if err := validateAuthMode(route.AuthMode); err != nil {
+		return err
+	}
+	
+	// Validate JSON fields
+	if len(route.HeadersJSON) > 0 {
+		if err := validateJSON(string(route.HeadersJSON)); err != nil {
+			return fmt.Errorf("headers_json validation failed: %w", err)
+		}
+	}
+	
+	if len(route.CachingPolicyJSON) > 0 {
+		if err := validateJSON(string(route.CachingPolicyJSON)); err != nil {
+			return fmt.Errorf("caching_policy_json validation failed: %w", err)
+		}
+	}
+	
+	if len(route.RateLimitPolicyJSON) > 0 {
+		if err := validateJSON(string(route.RateLimitPolicyJSON)); err != nil {
+			return fmt.Errorf("rate_limit_policy_json validation failed: %w", err)
+		}
+	}
+	
+	return nil
+}
+
+// handleV1Routes handles v1 routes collection endpoints with validation
+func (s *Server) handleV1Routes(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		s.getV1Routes(w, r)
+	case "POST":
+		s.createV1Route(w, r)
+	}
+}
+
+// handleV1Route handles v1 individual route endpoints with validation
+func (s *Server) handleV1Route(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid route ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		s.getV1Route(w, r, id)
+	case "PUT":
+		s.updateV1Route(w, r, id)
+	case "DELETE":
+		s.deleteV1Route(w, r, id)
+	}
+}
+
+// getV1Routes retrieves all routes using the new v1 format
+func (s *Server) getV1Routes(w http.ResponseWriter, r *http.Request) {
+	tenantID := s.getTenantID(r)
+	
+	routes, err := s.routesService.GetByTenant(r.Context(), tenantID)
+	if err != nil {
+		log.Printf("Error getting routes for tenant %d: %v", tenantID, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(routes)
+}
+
+// createV1Route creates a new route with validation
+func (s *Server) createV1Route(w http.ResponseWriter, r *http.Request) {
+	tenantID := s.getTenantID(r)
+	
+	var route models.Route
+	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Set tenant ID
+	route.TenantID = tenantID
+
+	// Validate the route input
+	if err := s.validateRouteInput(&route); err != nil {
+		http.Error(w, fmt.Sprintf("Validation error: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Create the route
+	if err := s.routesService.Create(r.Context(), &route); err != nil {
+		log.Printf("Error creating route for tenant %d: %v", tenantID, err)
+		http.Error(w, "Failed to create route", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(route)
+}
+
+// updateV1Route updates an existing route with validation
+func (s *Server) updateV1Route(w http.ResponseWriter, r *http.Request, id int) {
+	tenantID := s.getTenantID(r)
+	
+	// First, get the existing route to ensure it belongs to the tenant
+	existingRoute, err := s.routesService.GetByID(r.Context(), id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Route not found", http.StatusNotFound)
+		} else {
+			log.Printf("Error getting route %d: %v", id, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if existingRoute.TenantID != tenantID {
+		http.Error(w, "Route not found", http.StatusNotFound)
+		return
+	}
+
+	var route models.Route
+	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Set required fields
+	route.ID = id
+	route.TenantID = tenantID
+
+	// Validate the route input
+	if err := s.validateRouteInput(&route); err != nil {
+		http.Error(w, fmt.Sprintf("Validation error: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Update the route
+	if err := s.routesService.Update(r.Context(), &route); err != nil {
+		log.Printf("Error updating route %d for tenant %d: %v", id, tenantID, err)
+		http.Error(w, "Failed to update route", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(route)
+}
+
+// deleteV1Route deletes a route
+func (s *Server) deleteV1Route(w http.ResponseWriter, r *http.Request, id int) {
+	tenantID := s.getTenantID(r)
+	
+	// Verify the route belongs to the tenant before deleting
+	existingRoute, err := s.routesService.GetByID(r.Context(), id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Route not found", http.StatusNotFound)
+		} else {
+			log.Printf("Error getting route %d: %v", id, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if existingRoute.TenantID != tenantID {
+		http.Error(w, "Route not found", http.StatusNotFound)
+		return
+	}
+
+	if err := s.routesService.Delete(r.Context(), id, tenantID); err != nil {
+		log.Printf("Error deleting route %d for tenant %d: %v", id, tenantID, err)
+		http.Error(w, "Failed to delete route", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// getV1Route retrieves a single route
+func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
+	tenantID := s.getTenantID(r)
+	
+	route, err := s.routesService.GetByID(r.Context(), id)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Route not found", http.StatusNotFound)
+		} else {
+			log.Printf("Error getting route %d: %v", id, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Verify the route belongs to the tenant
+	if route.TenantID != tenantID {
+		http.Error(w, "Route not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(route)
 }
