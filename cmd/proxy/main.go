@@ -19,7 +19,9 @@ import (
 	"github.com/ubcent/edge.link/internal/config"
 	"github.com/ubcent/edge.link/internal/db"
 	"github.com/ubcent/edge.link/internal/logging"
+	internalMiddleware "github.com/ubcent/edge.link/internal/middleware"
 	"github.com/ubcent/edge.link/internal/proxy"
+	"github.com/ubcent/edge.link/internal/tracing"
 )
 
 const (
@@ -60,6 +62,33 @@ func main() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
+	// Initialize tracing
+	otlpEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otlpEndpoint == "" {
+		otlpEndpoint = "http://localhost:4318"
+	}
+
+	tracingProvider, err := tracing.NewProvider(tracing.Config{
+		ServiceName:    "edgelink-proxy",
+		ServiceVersion: version,
+		Environment:    "development",
+		OTLPEndpoint:   otlpEndpoint,
+		Enabled:        true,
+	})
+	if err != nil {
+		logger.Warn().Err(err).Msg("Failed to initialize tracing, continuing without tracing")
+		tracingProvider = &tracing.Provider{} // Use no-op provider
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := tracingProvider.Shutdown(ctx); err != nil {
+				logger.Error().Err(err).Msg("Failed to shutdown tracing provider")
+			}
+		}()
+		logger.Info().Str("endpoint", otlpEndpoint).Msg("Tracing initialized")
+	}
+
 	// Initialize database connection (optional for now)
 	var database *db.DB
 	if cfg.Database.Host != "" {
@@ -75,7 +104,7 @@ func main() {
 			ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
 		})
 		if err != nil {
-			logger.Warn("Failed to connect to database, running without DB", "error", err)
+			logger.Warn().Err(err).Msg("Failed to connect to database, running without DB")
 		} else {
 			defer func() { _ = database.Close() }()
 		}
@@ -87,8 +116,8 @@ func main() {
 	// Create chi router
 	r := chi.NewRouter()
 
-	// Add middleware
-	r.Use(middleware.Logger)
+	// Add middleware - replace default chi logger with our observability middleware
+	r.Use(internalMiddleware.LoggingAndTracing(logger, tracingProvider))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 
@@ -149,18 +178,18 @@ func main() {
 
 	// Start servers
 	go func() {
-		logger.Info("Starting proxy server", "addr", server.Addr)
+		logger.Info().Str("addr", server.Addr).Msg("Starting proxy server")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("Proxy server failed", "error", err)
+			logger.Error().Err(err).Msg("Proxy server failed")
 			os.Exit(1)
 		}
 	}()
 
 	if metricsServer != nil {
 		go func() {
-			logger.Info("Starting metrics server", "addr", metricsServer.Addr)
+			logger.Info().Str("addr", metricsServer.Addr).Msg("Starting metrics server")
 			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Error("Metrics server failed", "error", err)
+				logger.Error().Err(err).Msg("Metrics server failed")
 				os.Exit(1)
 			}
 		}()
@@ -171,7 +200,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down servers...")
+	logger.Info().Msg("Shutting down servers...")
 
 	// Create a context with timeout for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -179,17 +208,17 @@ func main() {
 
 	// Shutdown proxy server
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Error("Proxy server shutdown error", "error", err)
+		logger.Error().Err(err).Msg("Proxy server shutdown error")
 	}
 
 	// Shutdown metrics server
 	if metricsServer != nil {
 		if err := metricsServer.Shutdown(ctx); err != nil {
-			logger.Error("Metrics server shutdown error", "error", err)
+			logger.Error().Err(err).Msg("Metrics server shutdown error")
 		}
 	}
 
-	logger.Info("Servers stopped")
+	logger.Info().Msg("Servers stopped")
 }
 
 // healthHandler returns health status including database connectivity
