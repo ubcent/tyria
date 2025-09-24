@@ -47,11 +47,11 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 
 // Server represents the admin API server
 type Server struct {
-	db                    *sql.DB
-	router                *mux.Router
-	apiKeysService        *apikeys.Service
-	routesService         *routes.Service
-	customDomainsService  *customdomains.Service
+	db                   *sql.DB
+	router               *mux.Router
+	apiKeysService       *apikeys.Service
+	routesService        *routes.Service
+	customDomainsService *customdomains.Service
 }
 
 // writeJSONError writes a JSON formatted error response
@@ -966,7 +966,7 @@ func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 // handleCustomDomains handles the custom domains collection endpoint
 func (s *Server) handleCustomDomains(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	switch r.Method {
 	case httpMethodGET:
 		s.getCustomDomains(w, r)
@@ -980,7 +980,7 @@ func (s *Server) handleCustomDomains(w http.ResponseWriter, r *http.Request) {
 // handleCustomDomain handles individual custom domain endpoints
 func (s *Server) handleCustomDomain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -1001,7 +1001,7 @@ func (s *Server) handleCustomDomain(w http.ResponseWriter, r *http.Request) {
 // handleVerifyCustomDomain handles domain verification
 func (s *Server) handleVerifyCustomDomain(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -1015,7 +1015,7 @@ func (s *Server) handleVerifyCustomDomain(w http.ResponseWriter, r *http.Request
 // getCustomDomains retrieves all custom domains for a tenant
 func (s *Server) getCustomDomains(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	domains, err := s.customDomainsService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting custom domains for tenant %d: %v", tenantID, err)
@@ -1029,17 +1029,17 @@ func (s *Server) getCustomDomains(w http.ResponseWriter, r *http.Request) {
 // createCustomDomain creates a new custom domain
 func (s *Server) createCustomDomain(w http.ResponseWriter, r *http.Request) {
 	tenantID := s.getTenantID(r)
-	
+
 	var req struct {
 		Hostname string `json:"hostname"`
 	}
-	
+
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)) // 1MB limit
 	if err := decoder.Decode(&req); err != nil {
 		s.writeJSONError(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
-	
+
 	if req.Hostname == "" {
 		s.writeJSONError(w, "Hostname is required", http.StatusBadRequest)
 		return
@@ -1069,7 +1069,7 @@ func (s *Server) createCustomDomain(w http.ResponseWriter, r *http.Request) {
 // getCustomDomain retrieves a specific custom domain
 func (s *Server) getCustomDomain(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	domains, err := s.customDomainsService.GetByTenant(r.Context(), tenantID)
 	if err != nil {
 		log.Printf("Error getting custom domains for tenant %d: %v", tenantID, err)
@@ -1090,7 +1090,7 @@ func (s *Server) getCustomDomain(w http.ResponseWriter, r *http.Request, id int)
 // deleteCustomDomain deletes a custom domain
 func (s *Server) deleteCustomDomain(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	err := s.customDomainsService.Delete(r.Context(), id, tenantID)
 	if err != nil {
 		log.Printf("Error deleting custom domain %d: %v", id, err)
@@ -1104,7 +1104,7 @@ func (s *Server) deleteCustomDomain(w http.ResponseWriter, r *http.Request, id i
 // verifyCustomDomain verifies domain ownership
 func (s *Server) verifyCustomDomain(w http.ResponseWriter, r *http.Request, id int) {
 	tenantID := s.getTenantID(r)
-	
+
 	// Use the customdomains service verification method
 	verified, err := s.customDomainsService.VerifyDomain(r.Context(), id, tenantID)
 	if err != nil {
@@ -1159,13 +1159,19 @@ func (s *Server) handleWellKnownEdgeLink(w http.ResponseWriter, r *http.Request)
 		// If domain not found, return a generic response
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, "edge-link verification: domain not configured")
+		_, err := fmt.Fprintf(w, "edge-link verification: domain not configured")
+		if err != nil {
+			return
+		}
 		return
 	}
 
 	// Return verification information
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "edge-link verification\ntenant_id: %d\nverification_token: %s\ndomain: %s", 
+	_, err = fmt.Fprintf(w, "edge-link verification\ntenant_id: %d\nverification_token: %s\ndomain: %s",
 		domain.TenantID, domain.VerificationToken, domain.Hostname)
+	if err != nil {
+		return
+	}
 }

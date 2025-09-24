@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -242,7 +243,12 @@ func (s *Service) checkHTTPVerification(hostname, token string) bool {
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				fmt.Println("Error closing response body:", err)
+			}
+		}(resp.Body)
 
 		if resp.StatusCode == http.StatusOK {
 			// Read response body and check if it contains our token

@@ -131,7 +131,7 @@ func TestCustomDomainsService(t *testing.T) {
 
 func TestVerificationTokenGeneration(t *testing.T) {
 	service := &Service{}
-	
+
 	token1, err := service.generateVerificationToken()
 	if err != nil {
 		t.Errorf("Failed to generate token: %v", err)
