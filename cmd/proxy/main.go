@@ -152,7 +152,7 @@ func main() {
 	var metricsServer *http.Server
 	if cfg.Metrics.Enabled {
 		metricsRouter := chi.NewRouter()
-		
+
 		// Legacy JSON metrics endpoint
 		metricsRouter.Get("/metrics/json", func(w http.ResponseWriter, _ *http.Request) {
 			var stats interface{}
@@ -172,7 +172,7 @@ func main() {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		})
-		
+
 		// Prometheus metrics endpoint (standard /metrics path)
 		if proxyService != nil {
 			metricsRouter.Handle(cfg.Metrics.Path, proxyService.GetMetrics().PrometheusHandler())
@@ -183,9 +183,18 @@ func main() {
 			metricsRouter.Handle(cfg.Metrics.Path, func() http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-					w.Write([]byte("# HELP edgelink_info Information about the EdgeLink service\n"))
-					w.Write([]byte("# TYPE edgelink_info gauge\n"))
-					w.Write([]byte("edgelink_info{service=\"proxy\",status=\"healthy\"} 1\n"))
+					_, err := w.Write([]byte("# HELP edgelink_info Information about the EdgeLink service\n"))
+					if err != nil {
+						return
+					}
+					_, err = w.Write([]byte("# TYPE edgelink_info gauge\n"))
+					if err != nil {
+						return
+					}
+					_, err = w.Write([]byte("edgelink_info{service=\"proxy\",status=\"healthy\"} 1\n"))
+					if err != nil {
+						return
+					}
 				})
 			}())
 		}

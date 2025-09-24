@@ -26,7 +26,7 @@ type PrometheusMetrics struct {
 // NewPrometheusMetrics creates a new instance of Prometheus metrics
 func NewPrometheusMetrics() *PrometheusMetrics {
 	registry := prometheus.NewRegistry()
-	
+
 	requestsTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "proxy_requests_total",
@@ -73,10 +73,10 @@ func (pm *PrometheusMetrics) GetRegistry() *prometheus.Registry {
 // RecordRequest records a request with all necessary labels
 func (pm *PrometheusMetrics) RecordRequest(tenant, route string, statusCode int, cacheStatus string, latencyMs float64) {
 	statusCodeStr := strconv.Itoa(statusCode)
-	
+
 	// Increment request counter
 	pm.requestsTotal.WithLabelValues(tenant, route, statusCodeStr, cacheStatus).Inc()
-	
+
 	// Record latency
 	pm.latencyHistogram.WithLabelValues(tenant, route).Observe(latencyMs)
 }

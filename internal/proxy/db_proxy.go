@@ -630,11 +630,11 @@ func (s *DBService) logRequest(tenantID int, routeID *int, r *http.Request, star
 	if routeID != nil {
 		route = fmt.Sprintf("route_%d", *routeID)
 	}
-	
+
 	// Determine if it's a cache hit
 	cacheHit := cacheStatus == string(cache.CacheStatusHit)
 	isError := statusCode >= 400
-	
+
 	// Record metrics (both JSON and Prometheus)
 	s.metrics.RecordRouteMetricWithTenant(tenantIDStr, route, cacheHit, duration, isError, statusCode)
 
