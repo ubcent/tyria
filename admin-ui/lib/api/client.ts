@@ -118,6 +118,23 @@ export interface VerifyDomainResponse {
   message: string;
 }
 
+export interface Tenant {
+  id: number;
+  name: string;
+  plan: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserContext {
+  user_id: number;
+  tenant_id: number;
+  email: string;
+  role: string;
+  tenant: Tenant;
+}
+
 // Routes API (using new v1 endpoints)
 export const routesApi = {
   getAll: async (): Promise<Route[]> => {
@@ -233,6 +250,27 @@ export const dashboardApi = {
 export const healthApi = {
   check: async (): Promise<{ status: string; timestamp: string }> => {
     const response = await api.get('/health');
+    return response.data;
+  },
+};
+
+// Tenants API
+export const tenantsApi = {
+  getAll: async (): Promise<Tenant[]> => {
+    const response = await api.get('/api/v1/tenants');
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Tenant> => {
+    const response = await api.get(`/api/v1/tenants/${id}`);
+    return response.data;
+  },
+};
+
+// Auth API
+export const authApi = {
+  getProfile: async (): Promise<UserContext> => {
+    const response = await api.get('/api/auth/profile');
     return response.data;
   },
 };

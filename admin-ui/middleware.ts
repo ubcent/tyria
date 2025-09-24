@@ -11,8 +11,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Allow access to public pages
-  if (pathname === '/' || pathname.startsWith('/public') || pathname.startsWith('/_next')) {
+  // Allow access to public pages and demo pages
+  if (pathname === '/' || pathname.startsWith('/public') || pathname.startsWith('/_next') || pathname.startsWith('/demo') || pathname.startsWith('/app-demo')) {
     return NextResponse.next()
   }
 
