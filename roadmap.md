@@ -148,7 +148,7 @@ Admin UI: Domain linking page with step-by-step (add domain, verify, status badg
 ---
 
 ### Phase 2: Admin UI foundation (Next.js + Tailwind)
-13) Admin UI: App shell, navigation, and dark mode
+13) Admin UI: App shell, navigation, and dark mode ✅
 ```
 In Next.js App Router:
 - Create shared layout with sidebar/topbar, tenant switcher, and dark mode toggle (Tailwind `dark:` classes, store preference in localStorage + cookie for SSR).
