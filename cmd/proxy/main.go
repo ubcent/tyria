@@ -152,14 +152,18 @@ func main() {
 	var metricsServer *http.Server
 	if cfg.Metrics.Enabled {
 		metricsRouter := chi.NewRouter()
-		metricsRouter.Get(cfg.Metrics.Path, func(w http.ResponseWriter, _ *http.Request) {
+
+		// Legacy JSON metrics endpoint
+		metricsRouter.Get("/metrics/json", func(w http.ResponseWriter, _ *http.Request) {
 			var stats interface{}
 			if proxyService != nil {
 				stats = proxyService.GetMetrics().GetStats()
+			} else if dbProxyService != nil {
+				stats = dbProxyService.GetMetrics().GetStats()
 			} else {
-				// For DB proxy, return basic health info for now
+				// Fallback for when no service is available
 				stats = map[string]interface{}{
-					"service": "db-proxy",
+					"service": "proxy",
 					"status":  "healthy",
 				}
 			}
@@ -168,6 +172,32 @@ func main() {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		})
+
+		// Prometheus metrics endpoint (standard /metrics path)
+		if proxyService != nil {
+			metricsRouter.Handle(cfg.Metrics.Path, proxyService.GetMetrics().PrometheusHandler())
+		} else if dbProxyService != nil {
+			metricsRouter.Handle(cfg.Metrics.Path, dbProxyService.GetMetrics().PrometheusHandler())
+		} else {
+			// Fallback for when no service is available
+			metricsRouter.Handle(cfg.Metrics.Path, func() http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+					_, err := w.Write([]byte("# HELP edgelink_info Information about the EdgeLink service\n"))
+					if err != nil {
+						return
+					}
+					_, err = w.Write([]byte("# TYPE edgelink_info gauge\n"))
+					if err != nil {
+						return
+					}
+					_, err = w.Write([]byte("edgelink_info{service=\"proxy\",status=\"healthy\"} 1\n"))
+					if err != nil {
+						return
+					}
+				})
+			}())
+		}
 
 		metricsServer = &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Metrics.Port),

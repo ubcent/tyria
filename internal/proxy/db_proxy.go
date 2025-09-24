@@ -19,6 +19,7 @@ import (
 	"github.com/ubcent/edge.link/internal/apikeys"
 	"github.com/ubcent/edge.link/internal/cache"
 	"github.com/ubcent/edge.link/internal/customdomains"
+	"github.com/ubcent/edge.link/internal/metrics"
 	"github.com/ubcent/edge.link/internal/models"
 	"github.com/ubcent/edge.link/internal/ratelimit"
 	"github.com/ubcent/edge.link/internal/requestlogs"
@@ -57,6 +58,7 @@ type DBService struct {
 	cache          cache.Interface
 	keyBuilder     *cache.KeyBuilder
 	limiter        *ratelimit.Service
+	metrics        *metrics.Metrics
 }
 
 // NewDBService creates a new database-driven proxy service
@@ -86,6 +88,7 @@ func NewDBService(db *sql.DB) *DBService {
 		cache:          cacheInstance,
 		keyBuilder:     cache.NewKeyBuilder(),
 		limiter:        limiterInstance,
+		metrics:        metrics.New(),
 	}
 }
 
@@ -113,6 +116,7 @@ func NewDBServiceWithCache(db *sql.DB, cacheImpl cache.Interface) *DBService {
 		cache:          cacheImpl,
 		keyBuilder:     cache.NewKeyBuilder(),
 		limiter:        limiterInstance,
+		metrics:        metrics.New(),
 	}
 }
 
@@ -130,6 +134,7 @@ func NewDBServiceWithRateLimit(db *sql.DB, cacheImpl cache.Interface, rateLimitC
 		cache:          cacheImpl,
 		keyBuilder:     cache.NewKeyBuilder(),
 		limiter:        limiterInstance,
+		metrics:        metrics.New(),
 	}
 }
 
@@ -606,6 +611,7 @@ func (s *DBService) calculateRequestSize(r *http.Request) int64 {
 // logRequest logs the request to the database
 func (s *DBService) logRequest(tenantID int, routeID *int, r *http.Request, start time.Time, statusCode int, bytesIn, bytesOut int64, cacheStatus string) {
 	latencyMs := int(time.Since(start).Milliseconds())
+	duration := time.Since(start)
 
 	log := &models.RequestLog{
 		TenantID:    tenantID,
@@ -618,6 +624,20 @@ func (s *DBService) logRequest(tenantID int, routeID *int, r *http.Request, star
 		CreatedAt:   time.Now(),
 	}
 
+	// Record metrics for Prometheus
+	tenantIDStr := fmt.Sprintf("%d", tenantID)
+	route := "unknown"
+	if routeID != nil {
+		route = fmt.Sprintf("route_%d", *routeID)
+	}
+
+	// Determine if it's a cache hit
+	cacheHit := cacheStatus == string(cache.CacheStatusHit)
+	isError := statusCode >= 400
+
+	// Record metrics (both JSON and Prometheus)
+	s.metrics.RecordRouteMetricWithTenant(tenantIDStr, route, cacheHit, duration, isError, statusCode)
+
 	// Log asynchronously to avoid blocking the request
 	go func() {
 		if err := s.logsService.Log(context.Background(), log); err != nil {
@@ -625,6 +645,11 @@ func (s *DBService) logRequest(tenantID int, routeID *int, r *http.Request, star
 			fmt.Printf("Failed to log request: %v\n", err)
 		}
 	}()
+}
+
+// GetMetrics returns the metrics instance for the DB service
+func (s *DBService) GetMetrics() *metrics.Metrics {
+	return s.metrics
 }
 
 // getClientIP extracts the client IP address from the request

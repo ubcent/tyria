@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Metrics collects and tracks various proxy metrics
@@ -30,6 +32,9 @@ type Metrics struct {
 
 	// Start time
 	StartTime time.Time `json:"start_time"`
+
+	// Prometheus metrics
+	prometheus *PrometheusMetrics
 }
 
 // RouteMetrics tracks metrics for a specific route
@@ -48,6 +53,7 @@ func New() *Metrics {
 		RouteMetrics: make(map[string]*RouteMetrics),
 		StatusCodes:  make(map[int]int64),
 		StartTime:    time.Now(),
+		prometheus:   NewPrometheusMetrics(),
 	}
 }
 
@@ -102,9 +108,15 @@ func (m *Metrics) RecordStatusCode(code int) {
 
 // RecordRouteMetric records metrics for a specific route
 func (m *Metrics) RecordRouteMetric(route string, hit bool, duration time.Duration, isError bool) {
+	m.RecordRouteMetricWithTenant("unknown", route, hit, duration, isError, 200)
+}
+
+// RecordRouteMetricWithTenant records metrics for a specific route with tenant and status code information
+func (m *Metrics) RecordRouteMetricWithTenant(tenant, route string, hit bool, duration time.Duration, isError bool, statusCode int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// Update existing JSON metrics
 	routeMetric, exists := m.RouteMetrics[route]
 	if !exists {
 		routeMetric = &RouteMetrics{}
@@ -123,6 +135,16 @@ func (m *Metrics) RecordRouteMetric(route string, hit bool, duration time.Durati
 
 	if isError {
 		routeMetric.Errors++
+	}
+
+	// Update status code metrics
+	m.StatusCodes[statusCode]++
+
+	// Update Prometheus metrics if available
+	if m.prometheus != nil {
+		cacheStatus := GetCacheStatus(hit)
+		latencyMs := DurationToMs(duration)
+		m.prometheus.RecordRequest(tenant, route, statusCode, cacheStatus, latencyMs)
 	}
 }
 
@@ -234,6 +256,18 @@ func (m *Metrics) Handler() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+	}
+}
+
+// PrometheusHandler returns an HTTP handler that serves Prometheus metrics
+func (m *Metrics) PrometheusHandler() http.Handler {
+	return promhttp.HandlerFor(m.prometheus.GetRegistry(), promhttp.HandlerOpts{})
+}
+
+// UpdateRateLimiterTokens updates rate limiter token metrics for Prometheus
+func (m *Metrics) UpdateRateLimiterTokens(tenant, route, clientID string, tokens int) {
+	if m.prometheus != nil {
+		m.prometheus.UpdateRateLimiterTokens(tenant, route, clientID, float64(tokens))
 	}
 }
 
