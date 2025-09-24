@@ -21,10 +21,13 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     // Check for saved theme preference or default to light mode
     const savedTheme = localStorage.getItem('theme') as Theme;
+    const cookieTheme = document.cookie.split('; ').find(row => row.startsWith('theme='))?.split('=')[1] as Theme;
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
     if (savedTheme) {
       setTheme(savedTheme);
+    } else if (cookieTheme) {
+      setTheme(cookieTheme);
     } else if (prefersDark) {
       setTheme('dark');
     }
@@ -38,8 +41,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       document.documentElement.classList.remove('dark');
     }
     
-    // Save theme preference
+    // Save theme preference in localStorage and cookie for SSR
     localStorage.setItem('theme', theme);
+    document.cookie = `theme=${theme}; path=/; max-age=31536000; SameSite=Lax`; // 1 year
   }, [theme]);
 
   const toggleTheme = () => {

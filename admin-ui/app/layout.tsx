@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import './globals.css'
 import { Providers } from './providers'
 
@@ -12,9 +13,26 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Get theme from cookies for SSR
+  const cookieStore = cookies()
+  const theme = cookieStore.get('theme')?.value || 'light'
+  
   return (
-    <html lang="en">
+    <html lang="en" className={theme}>
       <body className="font-sans antialiased">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Prevent flash of unstyled content by setting theme immediately
+              (function() {
+                const theme = localStorage.getItem('theme') || 
+                             document.cookie.split('; ').find(row => row.startsWith('theme='))?.split('=')[1] ||
+                             (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.className = theme;
+              })();
+            `,
+          }}
+        />
         <Providers>
           {children}
         </Providers>
