@@ -13,6 +13,7 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: '📊' },
   { name: 'Routes', href: '/routes', icon: '🛣️' },
   { name: 'API Keys', href: '/keys', icon: '🔑' },
+  { name: 'Domains', href: '/domains', icon: '🌐' },
   { name: 'Metrics', href: '/metrics', icon: '📈' },
 ];
 

@@ -98,6 +98,26 @@ export interface Activity {
   type: 'success' | 'warning' | 'error';
 }
 
+export interface CustomDomain {
+  id: number;
+  tenant_id: number;
+  hostname: string;
+  verification_token: string;
+  status: 'pending' | 'verified' | 'failed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCustomDomainRequest {
+  hostname: string;
+}
+
+export interface VerifyDomainResponse {
+  verified: boolean;
+  status: string;
+  message: string;
+}
+
 // Routes API (using new v1 endpoints)
 export const routesApi = {
   getAll: async (): Promise<Route[]> => {
@@ -166,6 +186,33 @@ export const apiKeysApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/api/v1/api-keys/${id}`);
+  },
+};
+
+// Custom Domains API
+export const customDomainsApi = {
+  getAll: async (): Promise<CustomDomain[]> => {
+    const response = await api.get('/api/v1/domains');
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<CustomDomain> => {
+    const response = await api.get(`/api/v1/domains/${id}`);
+    return response.data;
+  },
+
+  create: async (request: CreateCustomDomainRequest): Promise<CustomDomain> => {
+    const response = await api.post('/api/v1/domains', request);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/api/v1/domains/${id}`);
+  },
+
+  verify: async (id: number): Promise<VerifyDomainResponse> => {
+    const response = await api.post(`/api/v1/domains/${id}/verify`);
+    return response.data;
   },
 };
 
