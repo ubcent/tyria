@@ -18,6 +18,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/ubcent/edge.link/internal/apikeys"
+	"github.com/ubcent/edge.link/internal/customdomains"
 	"github.com/ubcent/edge.link/internal/models"
 	"github.com/ubcent/edge.link/internal/routes"
 )
@@ -46,10 +47,11 @@ func writeJSON(w http.ResponseWriter, data interface{}) {
 
 // Server represents the admin API server
 type Server struct {
-	db             *sql.DB
-	router         *mux.Router
-	apiKeysService *apikeys.Service
-	routesService  *routes.Service
+	db                    *sql.DB
+	router                *mux.Router
+	apiKeysService        *apikeys.Service
+	routesService         *routes.Service
+	customDomainsService  *customdomains.Service
 }
 
 // writeJSONError writes a JSON formatted error response
@@ -144,10 +146,11 @@ func NewServer(databaseURL string) (*Server, error) {
 	}
 
 	server := &Server{
-		db:             db,
-		router:         mux.NewRouter(),
-		apiKeysService: apikeys.NewService(db),
-		routesService:  routes.NewService(db),
+		db:                   db,
+		router:               mux.NewRouter(),
+		apiKeysService:       apikeys.NewService(db),
+		routesService:        routes.NewService(db),
+		customDomainsService: customdomains.NewService(db),
 	}
 
 	server.setupRoutes()
@@ -191,9 +194,17 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/keys", s.handleAPIKeys).Methods("GET", "POST", "OPTIONS")
 	api.HandleFunc("/keys/{id}", s.handleAPIKey).Methods("GET", "PUT", "DELETE", "OPTIONS")
 
+	// Custom Domains management - v1 endpoints
+	v1.HandleFunc("/domains", s.handleCustomDomains).Methods("GET", "POST", "OPTIONS")
+	v1.HandleFunc("/domains/{id}", s.handleCustomDomain).Methods("GET", "DELETE", "OPTIONS")
+	v1.HandleFunc("/domains/{id}/verify", s.handleVerifyCustomDomain).Methods("POST", "OPTIONS")
+
 	// Dashboard
 	api.HandleFunc("/dashboard/stats", s.handleDashboardStats).Methods("GET", "OPTIONS")
 	api.HandleFunc("/dashboard/activity", s.handleDashboardActivity).Methods("GET", "OPTIONS")
+
+	// Well-known endpoint for domain verification
+	s.router.HandleFunc("/.well-known/edge-link.txt", s.handleWellKnownEdgeLink).Methods("GET")
 
 	// Health check
 	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
@@ -950,4 +961,211 @@ func (s *Server) getV1Route(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	writeJSON(w, route)
+}
+
+// handleCustomDomains handles the custom domains collection endpoint
+func (s *Server) handleCustomDomains(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	switch r.Method {
+	case httpMethodGET:
+		s.getCustomDomains(w, r)
+	case httpMethodPOST:
+		s.createCustomDomain(w, r)
+	default:
+		s.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleCustomDomain handles individual custom domain endpoints
+func (s *Server) handleCustomDomain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		s.writeJSONError(w, "Invalid domain ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case httpMethodGET:
+		s.getCustomDomain(w, r, id)
+	case httpMethodDELETE:
+		s.deleteCustomDomain(w, r, id)
+	default:
+		s.writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleVerifyCustomDomain handles domain verification
+func (s *Server) handleVerifyCustomDomain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		s.writeJSONError(w, "Invalid domain ID", http.StatusBadRequest)
+		return
+	}
+
+	s.verifyCustomDomain(w, r, id)
+}
+
+// getCustomDomains retrieves all custom domains for a tenant
+func (s *Server) getCustomDomains(w http.ResponseWriter, r *http.Request) {
+	tenantID := s.getTenantID(r)
+	
+	domains, err := s.customDomainsService.GetByTenant(r.Context(), tenantID)
+	if err != nil {
+		log.Printf("Error getting custom domains for tenant %d: %v", tenantID, err)
+		s.writeJSONError(w, "Failed to retrieve custom domains", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, domains)
+}
+
+// createCustomDomain creates a new custom domain
+func (s *Server) createCustomDomain(w http.ResponseWriter, r *http.Request) {
+	tenantID := s.getTenantID(r)
+	
+	var req struct {
+		Hostname string `json:"hostname"`
+	}
+	
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)) // 1MB limit
+	if err := decoder.Decode(&req); err != nil {
+		s.writeJSONError(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+	
+	if req.Hostname == "" {
+		s.writeJSONError(w, "Hostname is required", http.StatusBadRequest)
+		return
+	}
+
+	domain := &models.CustomDomain{
+		TenantID: tenantID,
+		Hostname: req.Hostname,
+		Status:   "pending",
+	}
+
+	err := s.customDomainsService.Create(r.Context(), domain)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") || strings.Contains(err.Error(), "duplicate key") {
+			s.writeJSONError(w, "Domain already exists", http.StatusConflict)
+			return
+		}
+		log.Printf("Error creating custom domain: %v", err)
+		s.writeJSONError(w, "Failed to create custom domain", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, domain)
+}
+
+// getCustomDomain retrieves a specific custom domain
+func (s *Server) getCustomDomain(w http.ResponseWriter, r *http.Request, id int) {
+	tenantID := s.getTenantID(r)
+	
+	domains, err := s.customDomainsService.GetByTenant(r.Context(), tenantID)
+	if err != nil {
+		log.Printf("Error getting custom domains for tenant %d: %v", tenantID, err)
+		s.writeJSONError(w, "Failed to retrieve custom domain", http.StatusInternalServerError)
+		return
+	}
+
+	for _, domain := range domains {
+		if domain.ID == id {
+			writeJSON(w, domain)
+			return
+		}
+	}
+
+	s.writeJSONError(w, "Domain not found", http.StatusNotFound)
+}
+
+// deleteCustomDomain deletes a custom domain
+func (s *Server) deleteCustomDomain(w http.ResponseWriter, r *http.Request, id int) {
+	tenantID := s.getTenantID(r)
+	
+	err := s.customDomainsService.Delete(r.Context(), id, tenantID)
+	if err != nil {
+		log.Printf("Error deleting custom domain %d: %v", id, err)
+		s.writeJSONError(w, "Failed to delete custom domain", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// verifyCustomDomain verifies domain ownership
+func (s *Server) verifyCustomDomain(w http.ResponseWriter, r *http.Request, id int) {
+	tenantID := s.getTenantID(r)
+	
+	// Use the customdomains service verification method
+	verified, err := s.customDomainsService.VerifyDomain(r.Context(), id, tenantID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			s.writeJSONError(w, "Domain not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error verifying domain %d: %v", id, err)
+		s.writeJSONError(w, "Failed to verify domain", http.StatusInternalServerError)
+		return
+	}
+
+	status := "failed"
+	if verified {
+		status = "verified"
+	}
+
+	response := map[string]interface{}{
+		"verified": verified,
+		"status":   status,
+		"message":  s.getVerificationMessage(status),
+	}
+
+	writeJSON(w, response)
+}
+
+// getVerificationMessage returns a message for the verification status
+func (s *Server) getVerificationMessage(status string) string {
+	switch status {
+	case "verified":
+		return "Domain successfully verified"
+	case "pending":
+		return "Domain verification pending"
+	case "failed":
+		return "Domain verification failed. Please ensure the domain points to this server and try again."
+	default:
+		return "Unknown verification status"
+	}
+}
+
+// handleWellKnownEdgeLink handles the /.well-known/edge-link.txt endpoint
+func (s *Server) handleWellKnownEdgeLink(w http.ResponseWriter, r *http.Request) {
+	// Extract hostname from request
+	hostname := r.Host
+	if idx := strings.Index(hostname, ":"); idx != -1 {
+		hostname = hostname[:idx] // Remove port
+	}
+
+	// Try to find the custom domain record
+	domain, err := s.customDomainsService.GetByHostname(r.Context(), hostname)
+	if err != nil {
+		// If domain not found, return a generic response
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, "edge-link verification: domain not configured")
+		return
+	}
+
+	// Return verification information
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "edge-link verification\ntenant_id: %d\nverification_token: %s\ndomain: %s", 
+		domain.TenantID, domain.VerificationToken, domain.Hostname)
 }

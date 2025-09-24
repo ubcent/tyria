@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/ubcent/edge.link/internal/models"
@@ -170,4 +171,88 @@ func (s *Service) Delete(ctx context.Context, id int, tenantID int) error {
 	}
 
 	return nil
+}
+
+// UpdateStatus updates the status of a custom domain
+func (s *Service) UpdateStatus(ctx context.Context, id int, tenantID int, status string) error {
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE custom_domains SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND tenant_id = $3",
+		status, id, tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to update custom domain status: %w", err)
+	}
+
+	return nil
+}
+
+// VerifyDomain verifies domain ownership via DNS TXT record or HTTP challenge
+func (s *Service) VerifyDomain(ctx context.Context, id int, tenantID int) (bool, error) {
+	// Get domain record
+	domains, err := s.GetByTenant(ctx, tenantID)
+	if err != nil {
+		return false, err
+	}
+
+	var domain *models.CustomDomain
+	for _, d := range domains {
+		if d.ID == id {
+			domain = d
+			break
+		}
+	}
+
+	if domain == nil {
+		return false, fmt.Errorf("domain not found")
+	}
+
+	// Check DNS TXT record first
+	verified, err := s.checkDNSVerification(domain.Hostname, domain.VerificationToken)
+	if err == nil && verified {
+		// Update status to verified
+		if err := s.UpdateStatus(ctx, id, tenantID, "verified"); err != nil {
+			return false, fmt.Errorf("failed to update domain status: %w", err)
+		}
+		return true, nil
+	}
+
+	// If DNS verification fails, try HTTP challenge
+	verified = s.checkHTTPVerification(domain.Hostname, domain.VerificationToken)
+	if verified {
+		// Update status to verified
+		if err := s.UpdateStatus(ctx, id, tenantID, "verified"); err != nil {
+			return false, fmt.Errorf("failed to update domain status: %w", err)
+		}
+		return true, nil
+	}
+
+	// Update status to failed
+	if err := s.UpdateStatus(ctx, id, tenantID, "failed"); err != nil {
+		return false, fmt.Errorf("failed to update domain status: %w", err)
+	}
+
+	return false, nil
+}
+
+// checkHTTPVerification checks if domain has the verification token via HTTP challenge
+func (s *Service) checkHTTPVerification(hostname, token string) bool {
+	// Try both HTTP and HTTPS
+	for _, scheme := range []string{"http", "https"} {
+		url := fmt.Sprintf("%s://%s/.well-known/edge-link.txt", scheme, hostname)
+		resp, err := http.Get(url)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			// Read response body and check if it contains our token
+			body := make([]byte, 1024)
+			n, _ := resp.Body.Read(body)
+			content := string(body[:n])
+			if strings.Contains(content, token) {
+				return true
+			}
+		}
+	}
+	return false
 }
