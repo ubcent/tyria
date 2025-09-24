@@ -134,7 +134,7 @@ Expose `/metrics` with Prometheus client in Go.
 Add Grafana dashboards JSON in `deploy/grafana/dashboards/`.
 ```
 
-12) Domain linking and tenant resolution
+12) Domain linking and tenant resolution ✅
 ```
 Add `internal/domains`:
 - Allow tenants to add `custom_domains.hostname` and generate a `verification_token`.
