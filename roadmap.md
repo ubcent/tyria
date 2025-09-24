@@ -1,6 +1,6 @@
 ### Roadmap: Proxy-as-a-Service for MACH Integrations
 
-Last updated: 2025-09-23 14:43
+Last updated: 2025-09-24 10:36
 
 ---
 
@@ -124,7 +124,7 @@ Use `zerolog` or `zap`. Add request-scoped logger fields: `tenant_id`, `route_id
 - Provide `docker-compose.yml` services for Jaeger/Tempo and Loki/Grafana.
 ```
 
-11) Metrics with Prometheus
+11) Metrics with Prometheus ✅
 ```
 Expose `/metrics` with Prometheus client in Go.
 - Counters: `proxy_requests_total` by `tenant`, `route`, `status_code`, `cache_status`.
@@ -337,10 +337,20 @@ Generate code snippets for popular stacks to call the proxy with API keys.
 - UI: Explain why a request was blocked (rate limit, quota, auth) with links to docs.
 ```
 
-36) Internationalization and accessibility in admin UI
+36) Internationalization (EN/RU) and accessibility in admin UI
 ```
-- Add i18n framework (e.g., `next-intl`).
-- Ensure keyboard navigation, aria labels, contrast, and dark mode accessibility.
+Implement multilingual UI with English and Russian.
+- Use Next.js App Router-friendly i18n (e.g., `next-intl`) with `/[locale]` routing or middleware-based detection.
+- Default language: detect from `Accept-Language` header; persist `locale` cookie; respect user preference if language switcher used.
+- Language switcher in the topbar (EN | RU) with SSR-safe implementation; store preference in cookie + localStorage.
+- Translation files under `admin-ui/locales/{en,ru}/*.json` with namespacing (`common`, `nav`, `routes`, `keys`, `settings`, `auth`).
+- Fallback to English for missing keys; mark untranslated keys during dev.
+- Internationalize dates/numbers via `Intl` and date formatting helpers.
+- Ensure keyboard navigation, aria labels, contrast, and dark mode accessibility remain compliant.
+Acceptance:
+- UI can be toggled between English and Russian via switcher.
+- On first visit, UI defaults to browser language if supported; otherwise English.
+- Preference persists across reloads and sessions (cookie), works with SSR.
 ```
 
 37) Template library for integrations
