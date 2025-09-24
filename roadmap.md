@@ -157,7 +157,7 @@ In Next.js App Router:
 Ensure existing pages `app/routes/page.tsx` and `app/keys/page.tsx` fit into the shell.
 ```
 
-14) Admin UI: API client and error handling
+14) Admin UI: API client and error handling ✅
 ```
 Enhance `admin-ui/lib/api/client.ts`:
 - Base URL from env, include JWT cookie automatically.
